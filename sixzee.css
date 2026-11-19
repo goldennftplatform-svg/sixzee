@@ -119,16 +119,19 @@ body {
 
 .dice-tray {
   display: grid;
-  grid-template-columns: repeat(6, minmax(38px, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 6px;
   align-items: center;
-  min-height: 76px;
+  min-height: 68px;
 }
 
 .die {
   position: relative;
   aspect-ratio: 1;
-  min-width: 38px;
+  width: 100%;
+  min-width: 0;
+  max-width: 52px;
+  justify-self: center;
   border: 3px solid var(--sixzee-ivory);
   border-radius: 8px;
   background: linear-gradient(145deg, #fffdf4, #d9c9a4);
@@ -382,7 +385,7 @@ body {
 @media (max-width: 860px) {
   .sixzee-board { grid-template-columns: 1fr; }
   .dice-stage, .scorecard-wrap, .board-info, .opponents-area { grid-column: 1; }
-  .dice-tray { grid-template-columns: repeat(3, 1fr); }
+  .dice-tray { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
   .die { max-width: 76px; }
   .dice-header { font-size: 8px; }
 }
