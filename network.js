@@ -34,6 +34,7 @@ function GameNetwork() {
 
     var LS_LIST = 'sixzee_tables';
     var LS_PLAYER = 'sixzee_player_id';
+    var LS_TABLE = 'sixzee_table_id';
     var LS_BROADCAST = 'sixzee_broadcast_';
     var LS_CHAT = 'sixzee_chat_';
     var LS_STATE = 'sixzee_state_';
@@ -129,8 +130,15 @@ function GameNetwork() {
         state.serverUrl = isStaticHost(window.location.hostname)
             ? ((window.SIXZEE_CONFIG || {}).relayUrl || '').replace(/\/+$/, '') || null
             : null;
-        state.playerId = sessionStorage.getItem(LS_PLAYER) || ('p_' + Math.random().toString(36).substr(2, 9));
+        // Persistent across reloads AND new tabs: the same browser is the same
+        // person, so a rejoin reclaims the original seat instead of a new one.
+        state.playerId = localStorage.getItem(LS_PLAYER)
+            || sessionStorage.getItem(LS_PLAYER)
+            || ('p_' + Math.random().toString(36).substr(2, 9));
+        localStorage.setItem(LS_PLAYER, state.playerId);
         sessionStorage.setItem(LS_PLAYER, state.playerId);
+        // Remember the table so a refresh reconnects to the same match.
+        state.tableId = localStorage.getItem(LS_TABLE) || null;
 
         // Pages has no relay API. Do not delay browser play on an API probe.
         if (!state.serverUrl && isStaticHost(window.location.hostname)) {
@@ -179,6 +187,7 @@ function GameNetwork() {
             return post('/api/tables', { mode: mode, name: name, playerId: state.playerId }).then(function (res) {
                 if ((res.ok || res.success) && res.tableId) {
                     state.tableId = res.tableId;
+                    localStorage.setItem(LS_TABLE, res.tableId);
                     listCache = listCache.filter(function (t) { return t.id !== res.tableId; }).concat([res.table]);
                     emit('tableList', listCache);
                     connectRelay();
@@ -191,12 +200,19 @@ function GameNetwork() {
 
     function joinTable(tableId, name) {
         if (state.mode === 'relay') {
-            return post('/api/tables/' + tableId + '/join', { playerId: state.playerId, name: name || state.playerName }).then(function (res) {
-                if (res.ok || res.success) {
-                    state.tableId = tableId;
-                    connectRelay();
-                }
-                return res;
+            var previous = state.tableId;
+            var leavePrevious = (previous && previous !== tableId)
+                ? post('/api/tables/' + previous + '/leave', { playerId: state.playerId })
+                : Promise.resolve();
+            return leavePrevious.then(function () {
+                return post('/api/tables/' + tableId + '/join', { playerId: state.playerId, name: name || state.playerName }).then(function (res) {
+                    if (res.ok || res.success) {
+                        state.tableId = tableId;
+                        localStorage.setItem(LS_TABLE, tableId);
+                        connectRelay();
+                    }
+                    return res;
+                });
             });
         }
         return Promise.resolve({ success: false, error: 'Connect to the multiplayer relay to join a human table.' });
@@ -211,6 +227,7 @@ function GameNetwork() {
     }
 
     function leaveTable() {
+        localStorage.removeItem(LS_TABLE);
         if (state.mode === 'relay' && state.tableId) {
             return post('/api/tables/' + state.tableId + '/leave', { playerId: state.playerId }).then(function (res) {
                 state.tableId = null; return res;

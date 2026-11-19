@@ -545,6 +545,10 @@ body {
 .lobby-seat.you { border-color: var(--chip-color); box-shadow: 0 0 16px rgba(244, 187, 63, 0.25); }
 .lobby-seat.ready { background: rgba(95, 224, 208, 0.1); border-color: var(--sixzee-teal); }
 .lobby-seat.empty { border-style: dashed; opacity: 0.6; }
+.lobby-seat.away { border-style: dashed; opacity: 0.75; }
+.lobby-seat.away .seat-ready { color: #ff9d5c; }
+.player-chip.away { border-style: dashed; opacity: 0.72; }
+.player-chip.away .chip-name { color: #ff9d5c; }
 .seat-num {
   color: var(--chip-color);
   font-family: 'Press Start 2P', monospace;

@@ -49,6 +49,8 @@ Public build: **https://github.com/goldennftplatform-svg/sixzee**
 - **Create table / open tables** — real cross-device 2–6 player tables over the Node relay (SSE + HTTP POST). Hosting a table opens a **waiting room**: every seat is visible, you can **INVITE A FRIEND** with a direct seat link, and the game deals in only when all seats are filled and every player presses **READY UP**. No AI ever joins a human table.
 - **Token matches** — signed-in accounts can stake 20 test pts (0.02 tLTC) against the funded AI bankroll in head-to-head play. Test coins have no cash value.
 
+Human identity is stable per browser, and your table is remembered: closing the tab or refreshing mid-match flags your seat **AWAY** but keeps your dice, holds, scorecard and turn exactly as they were. Reopening the game reclaims the same seat automatically — nobody can steal it while you are away, and it looks like the same person when you return.
+
 Static GitHub Pages hosts play solo; human tables need the relay because Pages has no `/api/*` backend. `config.js` decides this in one place.
 
 ## Run locally

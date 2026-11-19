@@ -553,6 +553,9 @@ class SixzeeUI {
 
     handleStateUpdate(state) {
         if (!state) return;
+        // A reconnecting browser gets its table id on every snapshot now, so
+        // reloading mid-game restores the same seat instead of a fresh one.
+        this.tableId = state.tableId || this.tableId || this.network.tableId;
         if (state.phase === 'WAITING') {
             this.showTableLobby(state);
             return;
@@ -600,10 +603,11 @@ class SixzeeUI {
                     html += `<div class="lobby-seat empty"><span class="seat-num">${i + 1}</span><span class="seat-name">OPEN SEAT</span><span class="seat-ready">WAITING</span></div>`;
                     continue;
                 }
-                html += `<div class="lobby-seat ${p.ready ? 'ready' : ''} ${isYou ? 'you' : ''}" style="--chip-color:${colors[i % colors.length]}">
+                const away = p.present === false;
+                html += `<div class="lobby-seat ${p.ready ? 'ready' : ''} ${isYou ? 'you' : ''} ${away ? 'away' : ''}" style="--chip-color:${colors[i % colors.length]}">
                     <span class="seat-num">${i + 1}</span>
                     <span class="seat-name">${this.escapeHtml(p.name)}${isYou ? ' (YOU)' : ''}</span>
-                    <span class="seat-ready">${p.ready ? '✓ READY' : 'NOT READY'}</span>
+                    <span class="seat-ready">${away ? '⚠ AWAY — SEAT SAVED' : p.ready ? '✓ READY' : 'NOT READY'}</span>
                 </div>`;
             }
             seatsHost.innerHTML = html;
@@ -662,15 +666,18 @@ class SixzeeUI {
         const host = document.getElementById('player-scores');
         if (!host) return;
         const colors = ['#f4bb3f', '#5fe0d0', '#ff8fb1', '#a6d86b', '#c58bff', '#ff9d5c'];
-        host.innerHTML = state.players.map((p, i) => `
-            <div class="player-chip ${i === state.currentPlayer ? 'active' : ''}" style="--chip-color:${colors[i % colors.length]}">
+        host.innerHTML = state.players.map((p, i) => {
+            const away = p.present === false;
+            return `
+            <div class="player-chip ${i === state.currentPlayer ? 'active' : ''} ${away ? 'away' : ''}" style="--chip-color:${colors[i % colors.length]}">
                 ${this.sixGlyph(p.score?.filled || 0, true)}
                 <span class="chip-copy">
-                    <span class="chip-name">${this.escapeHtml(p.name)}</span>
+                    <span class="chip-name">${this.escapeHtml(p.name)}${away ? ' · AWAY' : ''}</span>
                     ${p.sixzeeBonuses ? `<span class="chip-bonus" title="${p.sixzeeBonuses} extra Sixzee bonus">+${p.sixzeeBonuses * 100} SIXZEE</span>` : ''}
                 </span>
                 <b>${p.score?.total ?? 0}</b>
-            </div>`).join('');
+            </div>`;
+        }).join('');
     }
 
     renderOpponents(state) {

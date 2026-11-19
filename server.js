@@ -124,7 +124,12 @@ function tableToJson(table) {
         id: table.id,
         mode: table.mode,
         created: table.created,
-        players: table.players.map(p => ({ id: p.id, name: p.name, ready: !!p.ready }))
+        players: table.players.map(p => ({
+            id: p.id,
+            name: p.name,
+            ready: !!p.ready,
+            present: p.present !== false
+        }))
     };
 }
 
@@ -138,18 +143,22 @@ function broadcastTables() {
 // the same waiting room: "sit down, see who is here, ready up".
 function stateForPlayer(table, viewerIndex) {
     const state = table.engine.getState(viewerIndex);
+    // Identity + presence ride along on every snapshot so a reloading device
+    // restores the same seat (and the table id in the header) mid-game too.
+    state.tableId = table.id;
+    state.mode = table.mode;
+    state.viewerId = table.players[viewerIndex] ? table.players[viewerIndex].id : null;
+    state.players = state.players.map((p, i) => ({
+        ...p,
+        id: table.players[i] ? table.players[i].id : null,
+        ready: table.players[i] ? !!table.players[i].ready : false,
+        present: table.players[i] ? table.players[i].present !== false : false,
+    }));
     if (state.phase === 'WAITING') {
         const maxPlayers = seatCountForMode(table.mode);
-        state.players = state.players.map((p, i) => ({
-            ...p,
-            id: table.players[i] ? table.players[i].id : null,
-            ready: table.players[i] ? !!table.players[i].ready : false,
-        }));
-        state.tableId = table.id;
-        state.mode = table.mode;
         state.maxPlayers = maxPlayers;
         state.readyCount = table.players.filter(p => p.ready).length;
-        state.canStart = table.players.length === maxPlayers && table.players.every(p => p.ready);
+        state.canStart = table.players.length === maxPlayers && table.players.every(p => p.ready && p.present !== false);
     }
     return state;
 }
@@ -184,9 +193,9 @@ function broadcastTableState(table) {
 
 function maybeStartGame(table) {
     const maxPlayers = seatCountForMode(table.mode);
-    if (table.players.length === maxPlayers && table.players.every(p => p.ready)) {
-        return table.engine.startGame();
-    }
+    const seated = table.players.length === maxPlayers;
+    const allReady = table.players.every(p => p.ready && p.present !== false);
+    if (seated && allReady) return table.engine.startGame();
     return false;
 }
 
@@ -206,7 +215,7 @@ function createTable(mode, name, playerId) {
     if (name) {
         // The host takes a seat but is NOT auto-ready. Everyone reviews the
         // table and explicitly raises their hand before the dice start.
-        table.players.push({ id: playerId, name, ready: false });
+        table.players.push({ id: playerId, name, ready: false, present: true });
         table.engine.addPlayer(name, playerId);
     }
     tables.set(id, table);
@@ -218,13 +227,26 @@ function findTable(id) {
     return tables.get(id) || null;
 }
 
+// A returning device is recognised by its stable player id. Reclaiming keeps
+// the original seat index, name, scorecard and dice — nothing is thrown away.
+function reclaimSeat(table, playerId, playerName) {
+    const player = table.players.find(p => p.id === playerId);
+    if (!player) return null;
+    const wasAway = player.present === false;
+    player.present = true;
+    if (playerName) player.name = playerName;
+    if (wasAway) broadcastTableState(table);
+    return { player, reclaimed: wasAway };
+}
+
 function joinTable(table, playerName, playerId) {
-    if (table.players.some(p => p.id === playerId)) return { success: true, playerId, table };
+    const returning = reclaimSeat(table, playerId, playerName);
+    if (returning) return { success: true, playerId, table, reclaimed: returning.reclaimed };
     const maxPlayers = seatCountForMode(table.mode);
     if (table.players.length >= maxPlayers) {
         return { success: false, error: 'Table full' };
     }
-    const player = { id: playerId, name: playerName, ready: false };
+    const player = { id: playerId, name: playerName, ready: false, present: true };
     table.players.push(player);
     table.engine.addPlayer(playerName, playerId);
     maybeStartGame(table);
@@ -235,6 +257,7 @@ function joinTable(table, playerName, playerId) {
 function setPlayerReady(table, playerId, ready) {
     const player = table.players.find(p => p.id === playerId);
     if (!player) return null;
+    player.present = true;
     player.ready = !!ready;
     const started = maybeStartGame(table);
     broadcastTableState(table);
@@ -242,17 +265,38 @@ function setPlayerReady(table, playerId, ready) {
 }
 
 function leaveTable(table, playerId) {
-    table.players = table.players.filter(p => p.id !== playerId);
-    if (table.players.length === 0) {
-        tables.delete(table.id);
+    const player = table.players.find(p => p.id === playerId);
+    if (!player) return true;
+    if (!table.engine.game) {
+        // Still in the waiting room: free the seat so somebody else can sit.
+        table.players = table.players.filter(p => p.id !== playerId);
+        const engineIndex = table.engine.getPlayerIndex(playerId);
+        if (engineIndex !== -1) table.engine.playerInfo.splice(engineIndex, 1);
+        if (table.players.length === 0) tables.delete(table.id);
+    } else {
+        // Mid-match: never drop the seat or the scorecard. Mark them away so
+        // their dice, holds and total survive until they reconnect.
+        player.present = false;
     }
-    broadcastTables();
+    broadcastTableState(table);
     return true;
 }
 
 function unsubscribeStream(s) {
     streams.delete(s);
     s.res.end();
+    // No remaining channel for this player at this table = they backed out.
+    // Keep their seat and scorecard, just flag it away until they return.
+    if (!s.playerId || !s.tableId) return;
+    const stillHere = Array.from(streams).some((o) => o.playerId === s.playerId && o.tableId === s.tableId);
+    if (stillHere) return;
+    const table = findTable(s.tableId);
+    if (!table) return;
+    const player = table.players.find(p => p.id === s.playerId);
+    if (player && player.present !== false) {
+        player.present = false;
+        broadcastTableState(table);
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -471,7 +515,11 @@ const server = http.createServer((req, res) => {
             const table = findTable(tableId);
             if (table) {
                 const index = table.players.findIndex(p => p.id === playerId);
-                if (index !== -1) sendSse(res, 'state', { tableId, state: stateForPlayer(table, index) });
+                if (index !== -1) {
+                    // Opening the page again is a rejoin: bring the seat back.
+                    reclaimSeat(table, playerId, null);
+                    sendSse(res, 'state', { tableId, state: stateForPlayer(table, index) });
+                }
                 const roster = tableToJson(table);
                 sendSse(res, 'roster', roster.players);
             }
@@ -541,7 +589,7 @@ const server = http.createServer((req, res) => {
                     }
                     const result = joinTable(table, body.name, body.playerId);
                     if (result.success) {
-                        sendJson(res, 200, { success: true, playerId: result.playerId, table: tableToJson(table), tableId });
+                        sendJson(res, 200, { success: true, playerId: result.playerId, table: tableToJson(table), tableId, reclaimed: !!result.reclaimed });
                     } else {
                         sendJson(res, 409, result);
                     }
@@ -562,6 +610,7 @@ const server = http.createServer((req, res) => {
                 case 'state': {
                     const index = table.players.findIndex(p => p.id === (body && body.playerId));
                     if (index === -1) { sendJson(res, 403, { success: false, error: 'Take a seat first' }); return; }
+                    reclaimSeat(table, body.playerId, null);
                     sendJson(res, 200, { success: true, ok: true, state: stateForPlayer(table, index) });
                     return;
                 }
@@ -584,7 +633,7 @@ const server = http.createServer((req, res) => {
                     }
                     if (!result.success) { sendJson(res, 400, { success: false, error: result.error || 'Invalid move' }); return; }
                     broadcastState(table);
-                    sendJson(res, 200, { success: true, state: engine.getState(index) });
+                    sendJson(res, 200, { success: true, state: stateForPlayer(table, index) });
                     return;
                 }
                 case 'chat': {

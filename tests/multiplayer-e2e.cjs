@@ -71,6 +71,31 @@ const { server } = require('../server');
     assert.equal((await request(root + '/action', { playerId: 'outsider', action: 'roll' })).status, 403);
     assert.equal((await request(root + '/action', { playerId: 'guest', action: 'roll' })).status, 400);
 
+    // ---- Back out mid-match: the seat and scorecard must survive, and the
+    // ---- same player id must reclaim the exact seat on rejoin.
+    const rolledBefore = await request(root + '/action', { playerId: 'host', action: 'roll' });
+    assert.equal(rolledBefore.success, true);
+    const beforeLeave = rolledBefore.state;
+    assert.equal((await request(root + '/leave', { playerId: 'host' })).success, true);
+    // Observe from the guest so the pull itself does not reclaim the host.
+    const away = (await request(root + '/state', { playerId: 'guest', pull: true })).state;
+    assert.equal(away.phase, 'ROLL');
+    assert.equal(away.yourIndex, 1);
+    assert.equal(away.players[0].present, false);
+    assert.deepEqual(away.players[0].scorecard, beforeLeave.players[0].scorecard);
+    assert.deepEqual(away.dice, beforeLeave.dice);
+    // A stranger cannot take the saved seat while its owner is away.
+    assert.equal((await request(root + '/join', { name: 'STRANGER', playerId: 'stranger' })).status, 409);
+    const rejoined = await request(root + '/join', { name: 'HOST', playerId: 'host' });
+    assert.equal(rejoined.success, true);
+    assert.equal(rejoined.reclaimed, true);
+    state = (await request(root + '/state', { playerId: 'host', pull: true })).state;
+    assert.equal(state.yourIndex, 0);
+    assert.equal(state.players[0].present, true);
+    assert.equal(state.phase, 'ROLL');
+    assert.deepEqual(state.players[0].scorecard, beforeLeave.players[0].scorecard);
+    assert.deepEqual(state.dice, beforeLeave.dice);
+
     let moves = 0;
     while (state.phase !== 'GAME_OVER' && moves++ < 40) {
         const playerId = state.players[state.currentPlayer].index === 0 ? 'host' : 'guest';
