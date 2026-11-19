@@ -67,7 +67,8 @@ Environment: copy `.env.example` to `.env`. Important values:
 
 - **GitHub Pages** — the repo root is the static frontend (`.nojekyll` included). It uses `config.js → relayUrl` to find the shared relay.
 - **Render** — `render.yaml` is a zero-config Blueprint for a Node web service that serves the game *and* the SSE relay. Vercel-style serverless is not supported for SSE.
-- `render.yaml` repo/branch point at `goldennftplatform-svg/sixzee`, `main`.
+- `render.yaml` repo/branch point at `goldennftplatform-svg/sixzee`, `main`. The service is named `sixzee-relay`, so its public URL is `https://sixzee-relay.onrender.com` — the same value as `config.js → relayUrl`. If you deploy under a different name, update `relayUrl` to match.
+- Until the relay is deployed, the GitHub Pages build still plays solo; human tables need the relay and its `/api/*` routes.
 
 ## Litecoin / LitVM wiring
 

@@ -8,7 +8,7 @@
 # sync:false — Render asks you for them in the dashboard, never commits them.
 services:
   - type: web
-    name: sixzee
+    name: sixzee-relay
     runtime: node
     repo: https://github.com/goldennftplatform-svg/sixzee
     branch: main
