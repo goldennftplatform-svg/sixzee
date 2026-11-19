@@ -9,13 +9,15 @@ Public build: **https://github.com/goldennftplatform-svg/sixzee**
 - Cribbage cards, crib, starter, 31-count and 121-hole board are gone.
 - New `sixzee-engine.js`: 6 dice, 3 rolls per turn, 13 categories, uppercase/lowercase scorecard, AI opponent, and a server-authoritative adapter.
 - New dice UI: click dice to hold, reroll, then click a category to score. Live previews show what each open category would score.
-- Relay, wallet, auth, credits, staking, LitVM seam and 1v1 / 3-player tables are preserved and rebranded.
+- Legacy Yahtzee-style table play: **2–6 seats**, dice carried between players, and classic extra-Sixzee bonuses/jokers.
+- Relay, wallet, auth, credits, staking and LitVM seam are preserved and rebranded.
 - Safari-knights artwork from the supplied reference is used as the page background.
 
 ## Rules
 
 ### Turn
-- Six dice, three rolls. Roll 1 is automatic; hold any dice and roll up to two more times.
+- Six dice, three rolls per turn. Roll 1 is automatic; hold any dice and roll up to two more times.
+- The dice stay on the table between players. The next player can hold any of them and reroll the rest; only the very first roll of the game starts from a blank tray.
 - Assign the result to one unfilled category. A category can only be used once; a bad fit scores 0.
 - 13 rounds per player. Highest total wins.
 
@@ -36,13 +38,16 @@ Public build: **https://github.com/goldennftplatform-svg/sixzee**
 | Small Straight | 4 consecutive faces | 30 |
 | Large Straight | 5 consecutive faces | 40 |
 
-No Chance category, no joker / extra-roll bonus in v1.
+### Classic extras
+- Once the SIXZEE box holds 60, every later six-of-a-kind earns **+100** — even when its dice are parked in another category.
+- A later six-of-a-kind is also a **joker**: it may score Full House (30), Small Straight (30) or Large Straight (40).
+- No Chance category and no extra-roll bonus.
 
 ## Play modes
 
-- **Play vs AI** — free solo 1v1 or 3-player. AI rolls, holds and scores automatically.
-- **Create table / open tables** — real cross-device 1v1 or 3-player over the Node relay (SSE + HTTP POST).
-- **Token matches** — signed-in accounts can stake 20 test pts (0.02 tLTC) against the funded AI bankroll. Test coins have no cash value.
+- **Play vs AI** — free solo tables with 2–6 seats. AI players roll, hold and score automatically.
+- **Create table / open tables** — real cross-device 2–6 player tables over the Node relay (SSE + HTTP POST).
+- **Token matches** — signed-in accounts can stake 20 test pts (0.02 tLTC) against the funded AI bankroll in head-to-head play. Test coins have no cash value.
 
 Static GitHub Pages hosts play solo; human tables need the relay because Pages has no `/api/*` backend. `config.js` decides this in one place.
 
@@ -100,7 +105,7 @@ npm test
 npm run test:multiplayer
 ```
 
-`tests/scoring.cjs` covers 6-dice scoring, bonus and turn flow; `tests/multiplayer-e2e.cjs` boots the real relay in-process and plays a full 13-round human match.
+`tests/scoring.cjs` covers 6-dice scoring, upper/extra-Sixzee bonuses, joker rules, dice carry, and seat bounds; `tests/multiplayer-e2e.cjs` boots the real relay in-process and checks six-seat guards plus a full 13-round human match.
 
 ## Credits
 

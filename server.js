@@ -34,7 +34,7 @@ const auth = require('./auth');
 const store = require('./store');
 const pricing = require('./pricing');
 const providers = require('./providers');
-const { SixzeeServerEngine } = require('./sixzee-engine');
+const { SixzeeServerEngine, seatCountForMode } = require('./sixzee-engine');
 
 const ADMIN = process.env.SIXZEE_ADMIN_TOKEN || '';
 
@@ -186,7 +186,7 @@ function findTable(id) {
 
 function joinTable(table, playerName, playerId) {
     if (table.players.some(p => p.id === playerId)) return { success: true, playerId, table };
-    const maxPlayers = table.mode === '1v1' ? 2 : 3;
+    const maxPlayers = seatCountForMode(table.mode);
     if (table.players.length >= maxPlayers) {
         return { success: false, error: 'Table full' };
     }
@@ -469,8 +469,8 @@ const server = http.createServer((req, res) => {
 
     if (p === '/api/tables' && req.method === 'POST') {
         readBody(req).then((body) => {
-            if (!body || !['1v1', '3player'].includes(body.mode) || !body.playerId || !body.name) {
-                sendJson(res, 400, { success: false, error: 'mode required' });
+            if (!body || !seatCountForMode(body.mode) || !body.playerId || !body.name) {
+                sendJson(res, 400, { success: false, error: 'mode required (2–6 seats)' });
                 return;
             }
             const table = createTable(body.mode, body.name, body.playerId);

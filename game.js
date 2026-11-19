@@ -122,6 +122,20 @@ class SixzeeUI {
         this.renderTableList(this.network.getTableList());
     }
 
+    modeSeats(mode) {
+        return this.api.seatCountForMode(mode) || 2;
+    }
+
+    modeLabel(mode) {
+        const seats = this.modeSeats(mode);
+        return seats === 2 ? 'HEAD-TO-HEAD' : `${seats}-PLAYER SAFARI`;
+    }
+
+    modeIcon(mode) {
+        const icons = { 2: '🎲', 3: '🦏', 4: '🦒', 5: '🐘', 6: '🦁' };
+        return icons[this.modeSeats(mode)] || '🎲';
+    }
+
     renderTableList(tables) {
         const grid = document.getElementById('tables-grid');
         if (!grid) return;
@@ -136,14 +150,14 @@ class SixzeeUI {
             return;
         }
         grid.innerHTML = tables.map((table) => {
-            const maxPlayers = table.mode === '1v1' ? 2 : 3;
+            const maxPlayers = this.modeSeats(table.mode);
             const count = table.players.length;
             const isFull = count >= maxPlayers;
             const yours = table.players.some((p) => p.id === this.network.playerId);
             return `
                 <div class="table-card ${isFull ? 'full' : ''} ${yours ? 'current' : ''}" data-table-id="${table.id}">
-                    <div class="table-icon">${table.mode === '1v1' ? '🎲' : '🦏'}</div>
-                    <h4>${table.mode === '1v1' ? 'HEAD-TO-HEAD' : 'SAFARI TRIO'}</h4>
+                    <div class="table-icon">${this.modeIcon(table.mode)}</div>
+                    <h4>${this.modeLabel(table.mode)}</h4>
                     <div class="table-meta">Table #${table.id.slice(-5).toUpperCase()}</div>
                     <div>${yours ? 'YOUR TABLE · ' : ''}${count}/${maxPlayers} SEATED</div>
                     <div>${isFull ? 'IN PLAY' : yours ? 'WAITING FOR PLAYERS' : 'CLICK TO SIT'}</div>
@@ -156,7 +170,7 @@ class SixzeeUI {
 
     showCreateTableModal() {
         const mode = document.querySelector('.mode-card.selected')?.dataset.mode || '1v1';
-        this.showModal('CREATE TABLE', `<p>Create a ${mode === '1v1' ? 'head-to-head' : 'three-player'} Sixzee table?</p>`, [
+        this.showModal('CREATE TABLE', `<p>Create a ${this.modeLabel(mode).toLowerCase()} Sixzee table?</p>`, [
             { text: 'CREATE', class: 'primary', action: () => this.createTable(mode) },
             { text: 'CANCEL', action: () => this.hideModal() }
         ]);
@@ -216,7 +230,7 @@ class SixzeeUI {
     }
 
     setupLocalGame(mode, playerName) {
-        const count = mode === '1v1' ? 2 : 3;
+        const count = this.modeSeats(mode);
         this.lastMatchMode = mode;
         this.lastPlayerName = playerName;
         this.resetMatchStats();
@@ -233,7 +247,7 @@ class SixzeeUI {
         }
         this.engine = new this.api.SixzeeGame({ players });
         this.gameLog = [];
-        this.addLogEntry(`${mode === '1v1' ? 'Head-to-head' : 'Three-player'} Sixzee started. Roll the dice!`, 'system');
+        this.addLogEntry(`${this.modeLabel(mode)} Sixzee started. Dice are on the table — roll to begin!`, 'system');
         this.showGameScreen();
         this.renderGameState(this.engine.getState(this.localPlayerIndex));
         this.maybeRunAi();
@@ -376,7 +390,8 @@ class SixzeeUI {
 
     showMatchResult(state) {
         if (!state || state.phase !== 'GAME_OVER' || state.winner == null) return;
-        const token = state.winner + '|' + (state.scores || []).join(',');
+        const token = state.winner + '|' + (state.scores || []).join(',')
+            + '|' + (state.players || []).map((p) => p.sixzeeBonuses || 0).join(',');
         if (this.matchResultToken === token) return;
         this.matchResultToken = token;
         this.matchResultShown = true;
@@ -385,7 +400,11 @@ class SixzeeUI {
             phase: 'GAME_OVER',
             winner: state.winner,
             scores: [...(state.scores || [])],
-            players: (state.players || []).map((p) => ({ name: p.name, score: p.score?.total ?? p.score ?? 0 }))
+            players: (state.players || []).map((p) => ({
+                name: p.name,
+                score: p.score?.total ?? p.score ?? 0,
+                sixzeeBonuses: p.sixzeeBonuses || 0,
+            }))
         };
         this.updateMatchStatsButton();
         this.renderMatchResultModal();
@@ -399,7 +418,7 @@ class SixzeeUI {
         const winner = state.players[state.winner];
         const rows = state.players.map((p, i) => `
             <div class="score-row">
-                <span>${i === state.winner ? '👑 ' : ''}${this.escapeHtml(p.name)}</span>
+                <span>${i === state.winner ? '👑 ' : ''}${this.escapeHtml(p.name)}${p.sixzeeBonuses ? ` <small>+${p.sixzeeBonuses * 100} sixzee</small>` : ''}</span>
                 <b>${p.score}</b>
             </div>`).join('');
         let settlement = '';
@@ -452,10 +471,11 @@ class SixzeeUI {
 
     showRules() {
         this.showModal('SIXZEE RULES', `
-            <p><strong>6 dice. 3 rolls. 13 categories.</strong> Roll, click dice to hold, then click a scorecard category.</p>
+            <p><strong>2–6 players. 6 dice. 3 rolls. 13 categories.</strong> The dice stay on the table between turns — hold any of them, reroll the rest, then claim a category.</p>
             <p><strong>Upper:</strong> Ones–Sixes score face value × count. Reach <strong>84</strong> for a <strong>+35 bonus</strong>.</p>
             <p><strong>Lower:</strong> 3-of-a-kind / 4-of-a-kind score all six dice; 5-of-a-kind = 45; SIXZEE (six of a kind) = 60; Full House (3+3) = 30; Small Straight (4 in a row) = 30; Large Straight (5 in a row) = 40.</p>
-            <p>A roll that does not fit a category scores zero and closes it. Highest total wins.</p>
+            <p><strong>Classic extras:</strong> after your SIXZEE box holds 60, every later SIXZEE earns <strong>+100</strong> and becomes a <strong>joker</strong> — it may also score Full House or either straight.</p>
+            <p>A roll that does not fit a category scores zero and closes it. Highest total wins. No Chance category.</p>
         `, [{ text: 'GOT IT', class: 'primary', action: () => this.hideModal() }]);
     }
 
@@ -494,11 +514,12 @@ class SixzeeUI {
     renderPlayerChips(state) {
         const host = document.getElementById('player-scores');
         if (!host) return;
-        const colors = ['#f4bb3f', '#5fe0d0', '#ff8fb1'];
+        const colors = ['#f4bb3f', '#5fe0d0', '#ff8fb1', '#a6d86b', '#c58bff', '#ff9d5c'];
         host.innerHTML = state.players.map((p, i) => `
             <div class="player-chip ${i === state.currentPlayer ? 'active' : ''}" style="--chip-color:${colors[i % colors.length]}">
                 <span class="seat-dot"></span>
                 ${this.escapeHtml(p.name)}
+                ${p.sixzeeBonuses ? `<span class="chip-bonus" title="${p.sixzeeBonuses} extra Sixzee bonus">+${p.sixzeeBonuses * 100}</span>` : ''}
                 <b>${p.score?.total ?? 0}</b>
             </div>`).join('');
     }
@@ -518,11 +539,13 @@ class SixzeeUI {
     renderDice(state) {
         const tray = document.getElementById('dice-tray');
         if (!tray) return;
-        const beforeFirstRoll = state.rollsLeft === 3 && state.phase !== 'GAME_OVER';
-        const canHold = state.isYourTurn && !beforeFirstRoll && state.rollsLeft > 0 && state.phase !== 'GAME_OVER';
+        // Dice carry over from the previous player, so they are only blank
+        // before the very first roll of the whole game.
+        const blank = !state.hasRolled && state.phase !== 'GAME_OVER';
+        const canHold = state.isYourTurn && !blank && state.rollsLeft > 0 && state.phase !== 'GAME_OVER';
         tray.innerHTML = state.dice.map((die, index) => {
             const held = Boolean(die.held);
-            const pips = beforeFirstRoll ? [] : (SIXZEE_DIE_PIPS[die.value] || []);
+            const pips = blank ? [] : (SIXZEE_DIE_PIPS[die.value] || []);
             const face = Array.from({ length: 9 }, (_, cell) => (
                 pips.includes(cell) ? '<span class="pip"></span>' : '<span></span>'
             )).join('');
@@ -536,57 +559,96 @@ class SixzeeUI {
         });
 
         const rolls = document.getElementById('rolls-left');
-        if (rolls) rolls.textContent = state.phase === 'GAME_OVER' ? 'GAME OVER' : `${state.rollsLeft} ROLL${state.rollsLeft === 1 ? '' : 'S'} LEFT`;
+        if (rolls) rolls.textContent = state.phase === 'GAME_OVER'
+            ? 'GAME OVER'
+            : state.rollsLeft === 3 && state.hasRolled
+                ? '3 REROLLS · DICE CARRIED'
+                : `${state.rollsLeft} ROLL${state.rollsLeft === 1 ? '' : 'S'} LEFT`;
         const round = document.getElementById('round-label');
         if (round) round.textContent = `ROUND ${Math.min(state.round, 13)} / 13`;
         const rollBtn = document.getElementById('roll-btn');
         if (rollBtn) {
             rollBtn.disabled = !(state.isYourTurn && state.rollsLeft > 0 && state.phase !== 'GAME_OVER');
-            rollBtn.textContent = state.rollsLeft === 3 ? 'ROLL DICE' : `ROLL (${state.rollsLeft} LEFT)`;
+            rollBtn.textContent = state.hasRolled ? `REROLL (${state.rollsLeft})` : 'ROLL DICE';
         }
     }
 
     renderScorecards(state) {
-        const card = state.players[state.yourIndex]?.scorecard || {};
-        const canScore = state.isYourTurn && state.rollsLeft < 3 && state.phase !== 'GAME_OVER';
-        const options = canScore ? this.api.scoreOptions(state.dice.map((d) => d.value), card) : {};
+        const player = state.players[state.yourIndex] || {};
+        const card = player.scorecard || {};
+        const score = player.score || this.api.scoreCard(card, player.sixzeeBonuses || 0);
+        // Carried dice can be scored immediately; no need to burn a reroll.
+        const canScore = state.isYourTurn && state.hasRolled && state.phase !== 'GAME_OVER';
+        const values = state.dice.map((d) => d.value);
+        const options = canScore ? this.api.scoreOptions(values, card) : {};
+        const joker = canScore && this.api.jokerEligible(values, card);
         const cats = this.api.CATEGORIES;
         const upper = cats.filter((c) => c.group === 'upper');
         const lower = cats.filter((c) => c.group === 'lower');
+
+        const meta = {
+            ones: ['⚀', 'count × 1'], twos: ['⚁', 'count × 2'], threes: ['⚂', 'count × 3'],
+            fours: ['⚃', 'count × 4'], fives: ['⚄', 'count × 5'], sixes: ['⚅', 'count × 6'],
+            threeKind: ['🎯', '3 matching · all dice'], fourKind: ['🎯', '4 matching · all dice'],
+            fiveKind: ['🔥', '5 matching · 45 pts'], sixzee: ['👑', 'all six · 60 pts'],
+            fullHouse: ['🏠', 'three + three · 30'], smallStraight: ['🛤️', '4 in a row · 30'],
+            largeStraight: ['⚡', '5 in a row · 40'],
+        };
 
         const row = (cat) => {
             const value = card[cat.id];
             const filled = value !== null && value !== undefined;
             const preview = options[cat.id];
+            const [icon, hint] = meta[cat.id] || ['🎲', ''];
             const cls = [
                 'score-cell',
                 filled ? 'filled' : '',
                 filled && value === 0 ? 'zero' : '',
                 !filled && canScore ? 'preview' : '',
-                cat.id === 'sixzee' ? 'jackpot' : ''
+                cat.id === 'sixzee' ? 'jackpot' : '',
             ].join(' ');
             const shown = filled ? value : (canScore && preview != null ? `<span class="preview-value">${preview}</span>` : '—');
             return `<button type="button" class="${cls}" data-category="${cat.id}" ${filled || !canScore ? 'disabled' : ''}>
-                        <span>${cat.label}</span><span class="score-value">${shown}</span>
+                        <span class="cat-icon">${icon}</span>
+                        <span class="cat-copy"><span class="cat-name">${cat.label}</span><small>${hint}</small></span>
+                        <span class="score-value">${shown}</span>
                     </button>`;
         };
 
+        const summary = (label, value, className = '') => `
+            <div class="score-summary ${className}"><span>${label}</span><b>${value}</b></div>`;
+
         const upperHost = document.getElementById('upper-scorecard');
         const lowerHost = document.getElementById('lower-scorecard');
-        if (upperHost) upperHost.innerHTML = `<h3>UPPER SECTION</h3>${upper.map(row).join('')}`;
-        if (lowerHost) lowerHost.innerHTML = `<h3>LOWER SECTION</h3>${lower.map(row).join('')}`;
+        if (upperHost) {
+            upperHost.innerHTML = `
+                <div class="scorecard-head"><h3>UPPER SECTION</h3><span>THE FACE CARDS</span></div>
+                ${upper.map(row).join('')}
+                ${summary('Upper subtotal', score.upperSubtotal, 'summary-line')}
+                ${summary('Bonus · reach 84', score.bonus ? `+${score.bonus}` : '0 / 35', score.bonus ? 'summary-hit' : '')}`;
+        }
+        if (lowerHost) {
+            lowerHost.innerHTML = `
+                <div class="scorecard-head">
+                    <h3>LOWER SECTION</h3>
+                    ${joker ? '<span class="joker-badge">JOKER READY</span>' : '<span>THE COMBOS</span>'}
+                </div>
+                ${lower.map(row).join('')}
+                ${summary('Sixzee bonus', `${player.sixzeeBonuses || 0} × 100 = ${score.sixzeeBonus}`, score.sixzeeBonus ? 'summary-hit' : '')}
+                ${summary('Lower subtotal', score.lowerSubtotal, 'summary-line')}`;
+        }
         document.querySelectorAll('.score-cell[data-category]:not(:disabled)').forEach((el) => {
             el.addEventListener('click', () => this.scoreCategory(el.dataset.category));
         });
 
-        const score = state.players[state.yourIndex]?.score || this.api.scoreCard(card);
         const totals = document.getElementById('score-totals');
         if (totals) {
             totals.innerHTML = `
+                <div class="grand-total"><span>GRAND TOTAL</span><b>${score.total}</b><small>${score.filled} / 13 categories filled</small></div>
                 <div class="total-box">UPPER<b>${score.upperSubtotal}</b></div>
                 <div class="total-box">BONUS<b>${score.bonus} / 35</b></div>
-                <div class="total-box">LOWER<b>${score.lowerSubtotal}</b></div>
-                <div class="total-box">TOTAL<b>${score.total}</b></div>`;
+                <div class="total-box">SIXZEE<b>+${score.sixzeeBonus}</b></div>
+                <div class="total-box">LOWER<b>${score.lowerSubtotal}</b></div>`;
         }
     }
 
@@ -600,7 +662,7 @@ class SixzeeUI {
             : yourTurn ? 'YOUR TURN' : `${state.players[state.currentPlayer]?.name || 'OPPONENT'}'S TURN`;
         if (phase) phase.textContent = state.phase === 'GAME_OVER' ? 'FINAL SCORE' : `ROUND ${state.round} OF 13`;
         if (sub) sub.textContent = state.phase === 'GAME_OVER'
-            ? 'Highest total wins' : yourTurn ? 'Hold dice, reroll, then choose a category' : 'Waiting for the other player…';
+            ? 'Highest total wins' : yourTurn ? 'Dice carry over · hold, reroll, then claim a category' : 'Waiting for the other players…';
     }
 
     // -----------------------------------------------------------------------
@@ -619,7 +681,7 @@ class SixzeeUI {
 
     async toggleHold(index) {
         const state = this.getCurrentState();
-        if (!state.isYourTurn || state.rollsLeft === 3 || state.rollsLeft <= 0 || state.phase === 'GAME_OVER') return;
+        if (!state.isYourTurn || !state.hasRolled || state.rollsLeft <= 0 || state.phase === 'GAME_OVER') return;
         if (this.isRemote) {
             const mask = state.dice.reduce((acc, die, i) => (
                 acc | ((i === index ? !die.held : die.held) ? (1 << i) : 0)
@@ -633,14 +695,15 @@ class SixzeeUI {
 
     async scoreCategory(categoryId) {
         const state = this.getCurrentState();
-        if (!state.isYourTurn || state.rollsLeft === 3 || state.phase === 'GAME_OVER') return;
+        if (!state.isYourTurn || !state.hasRolled || state.phase === 'GAME_OVER') return;
         if (this.isRemote) {
             await this.network.sendGameAction('score', { categoryId });
             return;
         }
         const points = this.engine.score(categoryId);
         const name = state.players[state.yourIndex]?.name || 'YOU';
-        this.addLogEntry(`${name} scored ${points} in ${this.api.CATEGORIES.find((c) => c.id === categoryId)?.label || categoryId}.`, 'score');
+        const bonus = this.engine.lastBonusAwarded ? ' +100 SIXZEE BONUS!' : '';
+        this.addLogEntry(`${name} scored ${points} in ${this.api.CATEGORIES.find((c) => c.id === categoryId)?.label || categoryId}.${bonus}`, 'score');
         const fresh = this.engine.getState(this.localPlayerIndex);
         this.renderGameState(fresh);
         if (fresh.phase === 'GAME_OVER') this.showMatchResult(fresh);
@@ -673,7 +736,8 @@ class SixzeeUI {
                 }
                 const category = ai.chooseCategory(this.engine.dice.map((d) => d.value), this.engine.player.scorecard);
                 const points = this.engine.score(category);
-                this.addLogEntry(`${name} scored ${points} in ${this.api.CATEGORIES.find((c) => c.id === category)?.label || category}.`, 'score');
+                const bonus = this.engine.lastBonusAwarded ? ' +100 SIXZEE BONUS!' : '';
+                this.addLogEntry(`${name} scored ${points} in ${this.api.CATEGORIES.find((c) => c.id === category)?.label || category}.${bonus}`, 'score');
                 state = this.engine.getState(this.localPlayerIndex);
                 this.renderGameState(state);
             }

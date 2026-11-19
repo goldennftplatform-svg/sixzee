@@ -189,59 +189,145 @@ body {
   gap: 12px;
 }
 
+/* Paper scorecard, like the real Yahtzee pad, dropped onto the safari board. */
 .scorecard {
-  background: var(--sixzee-panel-2);
-  border: 1px solid var(--sixzee-line);
-  padding: 8px;
+  background: linear-gradient(180deg, #f8edd6 0%, #e9d6ae 100%);
+  border: 3px solid #b98528;
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.45), 0 6px 0 #6d4f1c;
+  padding: 10px 12px 12px;
+  color: #10262f;
 }
 
-.scorecard h3 {
-  margin: 2px 0 8px;
-  color: var(--sixzee-gold);
+.scorecard-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 2px dashed rgba(122, 63, 24, 0.6);
+  padding-bottom: 6px;
+  margin-bottom: 6px;
+}
+
+.scorecard-head h3 {
+  margin: 0;
+  color: #7a3f18;
   font-family: 'Press Start 2P', monospace;
   font-size: 10px;
 }
 
-.score-row {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  align-items: center;
+.scorecard-head > span {
+  color: #7a3f18;
+  font-family: 'VT323', monospace;
+  font-size: 14px;
+}
+
+.joker-badge {
+  background: #7a3f18;
+  border: 1px solid #f4bb3f;
+  color: #f4bb3f;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 8px;
+  padding: 4px 6px;
+  animation: joker-pulse 1.4s ease-in-out infinite alternate;
+}
+
+@keyframes joker-pulse {
+  from { box-shadow: 0 0 0 rgba(244, 187, 63, 0); }
+  to { box-shadow: 0 0 12px rgba(244, 187, 63, 0.65); }
 }
 
 .score-cell {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
+  display: grid;
+  grid-template-columns: 22px 1fr 44px;
+  align-items: center;
+  gap: 8px;
   width: 100%;
-  padding: 7px 9px;
+  min-height: 34px;
   margin: 2px 0;
-  border: 1px solid rgba(244, 187, 63, 0.18);
-  background: rgba(3, 16, 22, 0.72);
-  color: var(--sixzee-ivory);
+  padding: 3px 6px;
+  border: 1px solid rgba(122, 63, 24, 0.4);
+  border-bottom: 1px dotted rgba(122, 63, 24, 0.6);
+  background: rgba(255, 255, 255, 0.38);
+  color: #10262f;
   font-family: 'VT323', monospace;
-  font-size: 18px;
+  font-size: 19px;
   text-align: left;
   cursor: pointer;
 }
 
 .score-cell:hover:not(:disabled),
 .score-cell.preview:not(:disabled) {
-  border-color: var(--sixzee-teal);
-  background: rgba(95, 224, 208, 0.12);
+  border-color: #0a7d6f;
+  background: rgba(95, 224, 208, 0.22);
 }
 
 .score-cell:disabled { cursor: default; }
-.score-cell.filled { opacity: 0.85; }
-.score-cell.zero .score-value { color: var(--sixzee-danger); }
-.score-cell .score-value { color: var(--sixzee-gold); min-width: 26px; text-align: right; }
-.score-cell .preview-value { color: var(--sixzee-teal); }
-.score-cell.jackpot { border-color: rgba(244, 187, 63, 0.55); }
+.score-cell.filled { background: rgba(122, 63, 24, 0.08); }
+.score-cell.filled .cat-name { text-decoration: line-through; opacity: 0.62; }
+.score-cell.zero .score-value { color: #b23b2e; }
+.score-cell.jackpot { border-color: #b98528; background: rgba(244, 187, 63, 0.16); }
+
+.cat-icon { font-size: 16px; text-align: center; }
+.cat-copy { display: flex; flex-direction: column; line-height: 1.05; min-width: 0; }
+.cat-name { font-weight: 700; }
+.cat-copy small { color: #7a3f18; font-size: 13px; }
+
+.score-value {
+  display: grid;
+  place-items: center;
+  min-width: 40px;
+  height: 28px;
+  border: 2px solid #7a3f18;
+  background: #fffaf0;
+  color: #7a3f18;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 12px;
+}
+
+.score-cell.filled .score-value { background: #d9c49a; }
+.score-cell .preview-value { color: #0a7d6f; }
+
+.score-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 5px 6px 2px;
+  color: #7a3f18;
+  font-family: 'VT323', monospace;
+  font-size: 17px;
+}
+
+.score-summary b { font-family: 'Press Start 2P', monospace; font-size: 11px; }
+.score-summary.summary-line { border-top: 2px solid rgba(122, 63, 24, 0.55); margin-top: 5px; }
+.score-summary.summary-hit b { color: #0a7d6f; }
 
 .score-totals {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(95px, 1fr));
   gap: 8px;
 }
+
+.grand-total {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  padding: 9px 12px;
+  border: 2px solid #f4bb3f;
+  background: #7a3f18;
+  color: var(--sixzee-ivory);
+  font-family: 'VT323', monospace;
+  font-size: 18px;
+}
+
+.grand-total b {
+  color: #f4bb3f;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 22px;
+}
+
+.grand-total small { color: rgba(246, 234, 208, 0.75); font-size: 14px; }
 
 .total-box {
   padding: 10px;
@@ -260,6 +346,15 @@ body {
   font-size: 14px;
   margin-top: 4px;
 }
+
+.chip-bonus {
+  padding: 1px 5px;
+  border: 1px solid var(--sixzee-gold);
+  color: var(--sixzee-gold);
+  font-size: 14px;
+}
+
+.mode-cards .mode-card { width: 172px; }
 
 .phase-indicator {
   margin: 14px 18px 0;

@@ -23,6 +23,20 @@ const { server } = require('../server');
     assert.equal((await request('/api/health')).multiplayerProtocol, 1);
     assert.equal((await request('/api/health')).service, 'sixzee');
 
+    // Six-seat tables are the upper bound; a seventh seat must be refused.
+    const six = await request('/api/tables', { mode: '6player', name: 'P1', playerId: 'p1' });
+    assert.equal(six.success, true);
+    const sixRoot = '/api/tables/' + six.tableId;
+    for (let seat = 2; seat <= 6; seat += 1) {
+        assert.equal((await request(sixRoot + '/join', {
+            name: 'P' + seat, playerId: 'p' + seat
+        })).success, true);
+    }
+    assert.equal((await request(sixRoot + '/join', { name: 'P7', playerId: 'p7' })).status, 409);
+    const sixState = (await request(sixRoot + '/state', { playerId: 'p1', pull: true })).state;
+    assert.equal(sixState.players.length, 6);
+    assert.equal(sixState.phase, 'ROLL');
+
     const created = await request('/api/tables', { mode: '1v1', name: 'HOST', playerId: 'host' });
     assert.equal(created.success, true);
     const root = '/api/tables/' + created.tableId;

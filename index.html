@@ -9,7 +9,7 @@
     <meta name="apple-mobile-web-app-title" content="Sixzee">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎲</text></svg>">
     <title>Sixzee — Six Dice. One Champion.</title>
-    <meta name="description" content="Play Sixzee, an 8-bit six-dice scorecard game with live 1v1 and 3-player tables, solo AI, and optional LitVM test-token matches.">
+    <meta name="description" content="Play Sixzee, an 8-bit six-dice scorecard game with classic Yahtzee-style rules, live 2–6 player tables, solo AI, and optional LitVM test-token matches.">
     <meta name="author" content="Sixzee">
     <meta name="robots" content="index, follow">
     <link rel="canonical" href="https://goldennftplatform-svg.github.io/sixzee/">
@@ -18,7 +18,7 @@
     <meta property="og:url" content="https://goldennftplatform-svg.github.io/sixzee/">
     <meta property="og:site_name" content="Sixzee">
     <meta property="og:title" content="Sixzee — Six Dice. One Champion.">
-    <meta property="og:description" content="Live 1v1 and 3-player Sixzee tables, solo AI, and optional 20-point test-token matches. Free in your browser, no download.">
+    <meta property="og:description" content="Live 2–6 player Sixzee tables, solo AI, and optional 20-point test-token matches. Free in your browser, no download.">
     <meta property="og:image" content="https://goldennftplatform-svg.github.io/sixzee/assets/safari-knights-reference.jpg">
     <meta property="og:image:type" content="image/jpeg">
     <meta property="og:image:alt" content="Three knights standing together in a safari landscape, the art behind Sixzee">
@@ -26,11 +26,11 @@
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:url" content="https://goldennftplatform-svg.github.io/sixzee/">
     <meta name="twitter:title" content="Sixzee — Six Dice. One Champion.">
-    <meta name="twitter:description" content="Live 1v1 and 3-player Sixzee tables, solo AI, and optional 20-point test-token matches.">
+    <meta name="twitter:description" content="Live 2–6 player Sixzee tables, solo AI, and optional 20-point test-token matches.">
     <meta name="twitter:image" content="https://goldennftplatform-svg.github.io/sixzee/assets/safari-knights-reference.jpg">
 
     <script type="application/ld+json">
-    {"@context":"https://schema.org","@type":"VideoGame","name":"Sixzee","description":"Browser six-dice scorecard game with live 1v1 and 3-player tables, solo AI, and optional test-token matches.","url":"https://goldennftplatform-svg.github.io/sixzee/","image":"https://goldennftplatform-svg.github.io/sixzee/assets/safari-knights-reference.jpg","gamePlatform":"Web browser","applicationCategory":"Game","operatingSystem":"Any","playMode":["SinglePlayer","MultiPlayer"],"inLanguage":"en","isAccessibleForFree":true}
+    {"@context":"https://schema.org","@type":"VideoGame","name":"Sixzee","description":"Browser six-dice scorecard game with live 2–6 player tables, solo AI, and optional test-token matches.","url":"https://goldennftplatform-svg.github.io/sixzee/","image":"https://goldennftplatform-svg.github.io/sixzee/assets/safari-knights-reference.jpg","gamePlatform":"Web browser","applicationCategory":"Game","operatingSystem":"Any","playMode":["SinglePlayer","MultiPlayer"],"inLanguage":"en","isAccessibleForFree":true}
     </script>
 
     <link rel="stylesheet" href="styles.css?v=20261119-scoring-shell">
@@ -75,7 +75,7 @@
                 <div class="mode-selector">
                     <h2>SELECT GAME MODE</h2>
                     <div class="mode-cards">
-                        <button class="mode-card" data-mode="1v1">
+                        <button class="mode-card selected" data-mode="1v1">
                             <div class="mode-icon">🎲</div>
                             <h3>HEAD-TO-HEAD</h3>
                             <p>Classic 1v1 Sixzee</p>
@@ -86,6 +86,24 @@
                             <h3>SAFARI TRIO</h3>
                             <p>3-Player Sixzee</p>
                             <span class="players">3 PLAYERS</span>
+                        </button>
+                        <button class="mode-card" data-mode="4player">
+                            <div class="mode-icon">🦒</div>
+                            <h3>SAFARI FOUR</h3>
+                            <p>4-Player Sixzee</p>
+                            <span class="players">4 PLAYERS</span>
+                        </button>
+                        <button class="mode-card" data-mode="5player">
+                            <div class="mode-icon">🐘</div>
+                            <h3>SAFARI FIVE</h3>
+                            <p>5-Player Sixzee</p>
+                            <span class="players">5 PLAYERS</span>
+                        </button>
+                        <button class="mode-card" data-mode="6player">
+                            <div class="mode-icon">🦁</div>
+                            <h3>SAFARI SIX</h3>
+                            <p>6-Player Sixzee</p>
+                            <span class="players">6 PLAYERS</span>
                         </button>
                     </div>
                     <div class="ai-section">

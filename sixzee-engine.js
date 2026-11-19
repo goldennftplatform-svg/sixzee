@@ -27,9 +27,25 @@ const ROLLS_PER_TURN = 3;
 
 const FIVE_KIND_POINTS = 45;
 const SIXZEE_POINTS = 60;
+const SIXZEE_BONUS_POINTS = 100;
 const FULL_HOUSE_POINTS = 30;
 const SMALL_STRAIGHT_POINTS = 30;
 const LARGE_STRAIGHT_POINTS = 40;
+
+// Lobby modes kept as explicit strings so the relay and browser agree on the
+// exact same seat counts. `2player` is an alias for the original `1v1` mode.
+const MODE_SEATS = {
+  '1v1': 2,
+  '2player': 2,
+  '3player': 3,
+  '4player': 4,
+  '5player': 5,
+  '6player': 6,
+};
+
+function seatCountForMode(mode) {
+  return MODE_SEATS[mode] || 0;
+}
 
 function createScorecard() {
   const card = {};
@@ -79,13 +95,25 @@ function longestStraight(values) {
   return best;
 }
 
-function scoreRoll(dice, categoryId) {
+function isSixzeeRoll(dice) {
+  const values = diceValues(dice);
+  return Math.max(...counts(values).slice(1)) === DICE_COUNT;
+}
+
+// Classic Yahtzee joker: a Sixzee may stand in for Full House or a straight,
+// but only once the Sixzee box itself has been filled with 60.
+function jokerEligible(dice, card) {
+  return Boolean(card && card.sixzee === SIXZEE_POINTS && isSixzeeRoll(dice));
+}
+
+function scoreRoll(dice, categoryId, card = null) {
   if (!CATEGORY_IDS.includes(categoryId)) throw new Error(`Unknown category: ${categoryId}`);
   const values = diceValues(dice);
   const freq = counts(values);
   const totalPips = sum(values);
   const maxOfAKind = Math.max(...freq.slice(1));
   const run = longestStraight(values);
+  const joker = jokerEligible(values, card);
 
   switch (categoryId) {
     case 'ones': return freq[1] * 1;
@@ -97,18 +125,19 @@ function scoreRoll(dice, categoryId) {
     case 'threeKind': return maxOfAKind >= 3 ? totalPips : 0;
     case 'fourKind': return maxOfAKind >= 4 ? totalPips : 0;
     case 'fiveKind': return maxOfAKind >= 5 ? FIVE_KIND_POINTS : 0;
-    case 'sixzee': return maxOfAKind === 6 ? SIXZEE_POINTS : 0;
+    case 'sixzee': return maxOfAKind === DICE_COUNT ? SIXZEE_POINTS : 0;
     case 'fullHouse': {
       const groups = freq.slice(1).filter((count) => count > 0).sort((a, b) => b - a);
-      return groups.length === 2 && groups[0] === 3 && groups[1] === 3 ? FULL_HOUSE_POINTS : 0;
+      const natural = groups.length === 2 && groups[0] === 3 && groups[1] === 3;
+      return natural || joker ? FULL_HOUSE_POINTS : 0;
     }
-    case 'smallStraight': return run >= 4 ? SMALL_STRAIGHT_POINTS : 0;
-    case 'largeStraight': return run >= 5 ? LARGE_STRAIGHT_POINTS : 0;
+    case 'smallStraight': return run >= 4 || joker ? SMALL_STRAIGHT_POINTS : 0;
+    case 'largeStraight': return run >= 5 || joker ? LARGE_STRAIGHT_POINTS : 0;
     default: return 0;
   }
 }
 
-function scoreCard(card) {
+function scoreCard(card, sixzeeBonuses = 0) {
   let upperSubtotal = 0;
   let lowerSubtotal = 0;
   let filled = 0;
@@ -120,11 +149,14 @@ function scoreCard(card) {
     else lowerSubtotal += value;
   }
   const bonus = upperSubtotal >= UPPER_BONUS_THRESHOLD ? UPPER_BONUS_POINTS : 0;
+  const sixzeeBonus = (Number.isInteger(sixzeeBonuses) ? sixzeeBonuses : 0) * SIXZEE_BONUS_POINTS;
   return {
     upperSubtotal,
     bonus,
     lowerSubtotal,
-    total: upperSubtotal + bonus + lowerSubtotal,
+    sixzeeBonuses: Number.isInteger(sixzeeBonuses) ? sixzeeBonuses : 0,
+    sixzeeBonus,
+    total: upperSubtotal + bonus + lowerSubtotal + sixzeeBonus,
     filled,
     complete: filled === CATEGORIES.length,
   };
@@ -136,7 +168,7 @@ function openCategories(card) {
 
 function scoreOptions(dice, card) {
   const options = {};
-  for (const category of openCategories(card)) options[category.id] = scoreRoll(dice, category.id);
+  for (const category of openCategories(card)) options[category.id] = scoreRoll(dice, category.id, card);
   return options;
 }
 
@@ -153,17 +185,23 @@ function newDice(values = rollDice()) {
 class SixzeeGame {
   constructor({ players = ['Player 1', 'Player 2'], rng = Math.random } = {}) {
     if (players.length < 1) throw new Error('At least one player is required');
+    if (players.length > 6) throw new Error('Sixzee supports at most 6 players');
     this.rng = rng;
     this.players = players.map((name, index) => ({
       index,
       name,
       scorecard: createScorecard(),
+      sixzeeBonuses: 0,
       isAI: false,
     }));
     this.currentPlayer = 0;
     this.round = 1;
     this.rollsLeft = ROLLS_PER_TURN;
+    // Dice carry over between turns like a physical table. The UI hides them
+    // until the very first roll of the game via `hasRolled`.
     this.dice = newDice(rollDice(DICE_COUNT, this.rng));
+    this.hasRolled = false;
+    this.lastBonusAwarded = false;
     this.phase = 'roll';
     this.winner = null;
   }
@@ -179,42 +217,56 @@ class SixzeeGame {
       die.held ? die : { value: Math.floor(this.rng() * 6) + 1, held: false }
     ));
     this.rollsLeft -= 1;
+    this.hasRolled = true;
     return this.dice.map((die) => die.value);
   }
 
+  canHold() {
+    // Carried dice are visible at turn start, so they can be held before the
+    // first roll of that turn. Only the very first turn of the game is blank.
+    return this.phase === 'roll' && this.rollsLeft > 0 && this.hasRolled;
+  }
+
   toggleHold(index) {
-    if (this.phase !== 'roll' || this.rollsLeft <= 0 || this.rollsLeft === ROLLS_PER_TURN) {
-      return this.dice;
-    }
+    if (!this.canHold()) return this.dice;
     if (!this.dice[index]) throw new Error(`No die at index ${index}`);
     this.dice[index] = { ...this.dice[index], held: !this.dice[index].held };
     return this.dice;
   }
 
   setHolds(mask) {
-    if (this.phase !== 'roll' || this.rollsLeft <= 0 || this.rollsLeft === ROLLS_PER_TURN) return this.dice;
+    if (!this.canHold()) return this.dice;
     this.dice = this.dice.map((die, index) => ({ ...die, held: Boolean(mask & (1 << index)) }));
     return this.dice;
   }
 
   score(categoryId) {
     if (this.phase !== 'roll') throw new Error('Turn is already scored');
-    const card = this.player.scorecard;
+    if (!this.hasRolled) throw new Error('Roll the dice before scoring');
+    const player = this.player;
+    const card = player.scorecard;
     if (card[categoryId] !== null) throw new Error('That category is already filled');
-    card[categoryId] = scoreRoll(this.dice, categoryId);
+
+    // Classic rule: a Sixzee scored after the Sixzee box is already filled
+    // earns a 100-point bonus, and can act as a joker for house/straights.
+    this.lastBonusAwarded = card.sixzee === SIXZEE_POINTS && isSixzeeRoll(this.dice);
+    if (this.lastBonusAwarded) player.sixzeeBonuses += 1;
+    card[categoryId] = scoreRoll(this.dice, categoryId, card);
 
     const next = (this.currentPlayer + 1) % this.players.length;
     if (next === 0) this.round += 1;
-    if (this.players.every((p) => scoreCard(p.scorecard).complete)) {
+    if (this.players.every((p) => scoreCard(p.scorecard, p.sixzeeBonuses).complete)) {
       this.phase = 'done';
       this.winner = this.players.reduce((best, player) => (
-        scoreCard(player.scorecard).total > scoreCard(best.scorecard).total ? player : best
+        scoreCard(player.scorecard, player.sixzeeBonuses).total
+          > scoreCard(best.scorecard, best.sixzeeBonuses).total ? player : best
       ), this.players[0]).index;
       return card[categoryId];
     }
     this.currentPlayer = next;
     this.rollsLeft = ROLLS_PER_TURN;
-    this.dice = newDice(rollDice(DICE_COUNT, this.rng));
+    // Dice stay on the table for the next player; only holds are cleared.
+    this.dice = this.dice.map((die) => ({ value: die.value, held: false }));
     return card[categoryId];
   }
 
@@ -222,7 +274,7 @@ class SixzeeGame {
     return this.players.map((player) => ({
       index: player.index,
       name: player.name,
-      ...scoreCard(player.scorecard),
+      ...scoreCard(player.scorecard, player.sixzeeBonuses),
     }));
   }
 
@@ -232,11 +284,14 @@ class SixzeeGame {
         index: p.index,
         name: p.name,
         scorecard: { ...p.scorecard },
-        score: scoreCard(p.scorecard),
+        sixzeeBonuses: p.sixzeeBonuses,
+        score: scoreCard(p.scorecard, p.sixzeeBonuses),
       })),
       currentPlayer: this.currentPlayer,
       round: this.round,
       rollsLeft: this.rollsLeft,
+      hasRolled: this.hasRolled,
+      lastBonusAwarded: this.lastBonusAwarded,
       dice: this.dice.map((die) => ({ ...die })),
       phase: this.phase,
       winner: this.winner,
@@ -287,12 +342,15 @@ class SixzeeServerEngine {
           index,
           name: p.name,
           scorecard: createScorecard(),
-          score: scoreCard(createScorecard()),
+          sixzeeBonuses: 0,
+          score: scoreCard(createScorecard(), 0),
         })),
         scores: this.playerInfo.map(() => 0),
         currentPlayer: 0,
         round: 1,
         rollsLeft: ROLLS_PER_TURN,
+        hasRolled: false,
+        lastBonusAwarded: false,
         dice: newDice([1, 1, 1, 1, 1, 1]).map((die) => ({ ...die, value: 0 })),
         phase: 'WAITING',
         winner: null,
@@ -368,7 +426,7 @@ class SixzeeAI {
         const candidate = [...held];
         while (candidate.length < DICE_COUNT) candidate.push(Math.floor(this.rng() * 6) + 1);
         const categoryId = this.chooseCategory(candidate, card);
-        expected += categoryId ? scoreRoll(candidate, categoryId) : 0;
+        expected += categoryId ? scoreRoll(candidate, categoryId, card) : 0;
       }
       expected /= samples;
       // Prefer fewer held dice when scores are close, to keep improving.
@@ -387,11 +445,16 @@ const SixzeeAPI = {
   CATEGORY_IDS,
   UPPER_BONUS_THRESHOLD,
   UPPER_BONUS_POINTS,
+  SIXZEE_BONUS_POINTS,
+  MODE_SEATS,
+  seatCountForMode,
   DICE_COUNT,
   ROLLS_PER_TURN,
   createScorecard,
   validateDice,
   diceValues,
+  isSixzeeRoll,
+  jokerEligible,
   scoreRoll,
   scoreCard,
   openCategories,
