@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#06171f">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Sixzee">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎲</text></svg>">
+    <title>Sixzee — Six Dice. One Champion.</title>
+    <meta name="description" content="Play Sixzee, an 8-bit six-dice scorecard game with live 1v1 and 3-player tables, solo AI, and optional LitVM test-token matches.">
+    <meta name="author" content="Sixzee">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="https://goldennftplatform-svg.github.io/sixzee/">
+
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://goldennftplatform-svg.github.io/sixzee/">
+    <meta property="og:site_name" content="Sixzee">
+    <meta property="og:title" content="Sixzee — Six Dice. One Champion.">
+    <meta property="og:description" content="Live 1v1 and 3-player Sixzee tables, solo AI, and optional 20-point test-token matches. Free in your browser, no download.">
+    <meta property="og:image" content="https://goldennftplatform-svg.github.io/sixzee/assets/safari-knights-reference.jpg">
+    <meta property="og:image:type" content="image/jpeg">
+    <meta property="og:image:alt" content="Three knights standing together in a safari landscape, the art behind Sixzee">
+
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://goldennftplatform-svg.github.io/sixzee/">
+    <meta name="twitter:title" content="Sixzee — Six Dice. One Champion.">
+    <meta name="twitter:description" content="Live 1v1 and 3-player Sixzee tables, solo AI, and optional 20-point test-token matches.">
+    <meta name="twitter:image" content="https://goldennftplatform-svg.github.io/sixzee/assets/safari-knights-reference.jpg">
+
+    <script type="application/ld+json">
+    {"@context":"https://schema.org","@type":"VideoGame","name":"Sixzee","description":"Browser six-dice scorecard game with live 1v1 and 3-player tables, solo AI, and optional test-token matches.","url":"https://goldennftplatform-svg.github.io/sixzee/","image":"https://goldennftplatform-svg.github.io/sixzee/assets/safari-knights-reference.jpg","gamePlatform":"Web browser","applicationCategory":"Game","operatingSystem":"Any","playMode":["SinglePlayer","MultiPlayer"],"inLanguage":"en","isAccessibleForFree":true}
+    </script>
+
+    <link rel="stylesheet" href="styles.css?v=20261119-scoring-shell">
+    <link rel="stylesheet" href="app-layout.css?v=4">
+    <link rel="stylesheet" href="wallet-dropdown.css?v=20261118-metamask-network">
+    <link rel="stylesheet" href="app-shell.css?v=20261119-glossy-shell">
+    <link rel="stylesheet" href="sixzee.css?v=1">
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="game-container">
+        <!-- Landing / table select -->
+        <div id="landing-screen" class="screen active">
+            <div class="pixel-border">
+                <header class="pixel-header">
+                    <div class="logo">
+                        <span class="logo-icon">🎲</span>
+                        <h1>SIXZEE</h1>
+                        <span class="logo-icon">⚡</span>
+                    </div>
+                    <p class="tagline">SIX DICE · ONE CHAMPION · LITVM-READY</p>
+                    <button type="button" class="header-wallet-link" id="wallet-toggle" aria-expanded="false" aria-controls="wallet-menu">WALLET <span aria-hidden="true">▾</span></button>
+                </header>
+
+                <div class="stake-banner" id="stake-banner" role="status">
+                    <span class="stake-coin" aria-hidden="true">🪙</span>
+                    <div>
+                        <strong id="stake-title">FREE PLAY — OR PLAY FOR TEST TOKENS</strong>
+                        <p id="stake-copy">Sign in to the Sixzee wallet to stake 20 test pts (0.02 tLTC) per 1v1 AI match. Test coins have no cash value.</p>
+                    </div>
+                </div>
+
+                <section class="metamask-cta" aria-label="Add LitVM LiteForge to MetaMask">
+                    <div>
+                        <strong>ADD LITVM TO METAMASK — ONE CLICK</strong>
+                        <p>Adds the LitVM LiteForge testnet (chain 4441, zkLTC). It does not connect an account or stake tokens.</p>
+                    </div>
+                    <button type="button" class="pixel-btn metamask-add" data-litvm-add data-litvm-status="metamask-status">ADD LITVM TO METAMASK</button>
+                    <p class="metamask-status" id="metamask-status" role="status" hidden></p>
+                </section>
+
+                <div class="mode-selector">
+                    <h2>SELECT GAME MODE</h2>
+                    <div class="mode-cards">
+                        <button class="mode-card" data-mode="1v1">
+                            <div class="mode-icon">🎲</div>
+                            <h3>HEAD-TO-HEAD</h3>
+                            <p>Classic 1v1 Sixzee</p>
+                            <span class="players">2 PLAYERS</span>
+                        </button>
+                        <button class="mode-card" data-mode="3player">
+                            <div class="mode-icon">🦏</div>
+                            <h3>SAFARI TRIO</h3>
+                            <p>3-Player Sixzee</p>
+                            <span class="players">3 PLAYERS</span>
+                        </button>
+                    </div>
+                    <div class="ai-section">
+                        <h2>SOLO PLAY</h2>
+                        <button class="pixel-btn ai-btn" id="play-ai-btn">
+                            <span class="btn-icon">🤖</span>
+                            <span>PLAY VS AI</span>
+                        </button>
+                        <p class="ai-hint">Signed in? Stake 20 test pts (0.02 tLTC) vs a funded AI bankroll. Otherwise it's free.</p>
+                    </div>
+                </div>
+
+                <div class="table-list" id="table-list">
+                    <h2>OPEN TABLES</h2>
+                    <div class="tables-grid" id="tables-grid">
+                        <div class="table-card empty">
+                            <div class="table-icon">🌴</div>
+                            <p>No tables yet</p>
+                            <button class="pixel-btn create-table-btn" id="create-table-btn">CREATE TABLE</button>
+                        </div>
+                    </div>
+                </div>
+
+                <section class="profile-customizer" aria-label="Personalize your seat">
+                    <h2>YOUR SEAT. YOUR SAFARI.</h2>
+                    <div class="profile-grid">
+                        <div>
+                            <strong>KNIGHTS OF THE TABLE</strong>
+                            <p>Your scorecard is yours alone. Hold dice, chase the +35 upper bonus, and take the high score.</p>
+                        </div>
+                        <div>
+                            <div id="portrait-preview"></div>
+                            <label for="portrait-upload">Your player portrait</label>
+                            <input id="portrait-upload" type="file" accept="image/jpeg,image/png,image/webp">
+                            <button id="portrait-remove" class="pixel-btn secondary" type="button">REMOVE PHOTO</button>
+                            <small id="portrait-status" role="status">Optional. Saved on this browser.</small>
+                        </div>
+                    </div>
+                </section>
+
+                <div class="player-setup">
+                    <h2>YOUR NAME</h2>
+                    <input type="text" id="player-name" placeholder="Enter your name..." maxlength="12">
+                    <button class="pixel-btn" id="join-btn">JOIN SIXZEE</button>
+                </div>
+
+                <div class="wallet-dropdown" id="wallet-menu" hidden>
+                    <div class="wallet-dropdown-head">
+                        <strong>TEST WALLET</strong>
+                        <span>LiteForge · 4441</span>
+                    </div>
+                    <section id="wallet-root" aria-label="LiteForge test wallet">
+                        <p role="status">Opening wallet…</p>
+                    </section>
+                    <button type="button" class="wallet-dropdown-claim" id="claim-tokens-btn" disabled>CLAIM TEST zkLTC</button>
+                    <p class="wallet-dropdown-hint" id="claim-status" role="status">Sign in to check your faucet status.</p>
+                    <button type="button" class="wallet-dropdown-metamask" data-litvm-add data-litvm-status="metamask-dropdown-status">ADD LITVM TO METAMASK</button>
+                    <p class="metamask-status" id="metamask-dropdown-status" role="status" hidden></p>
+                    <p class="wallet-dropdown-hint">Email sign-in creates a test wallet on LiteForge. Sign in to the Sixzee credit wallet below to stake those credits in token matches.</p>
+                    <div class="wallet-dropdown-links">
+                        <a href="wallet-setup.html">FULL VIEW ↗</a>
+                        <a href="https://testnet.litvm.com" data-litvm-guide target="_blank" rel="noopener noreferrer">LITVM HUB ↗</a>
+                    </div>
+                    <div class="wallet-dropdown-divider">SIXZEE CUSTODY WALLET</div>
+                    <div class="wallet-panel" id="wallet-panel" hidden>
+                        <div class="wallet-header">
+                            <h2>LITECOIN WALLET</h2>
+                            <span class="wallet-net" id="wallet-net">TESTNET</span>
+                        </div>
+                        <div class="wallet-body">
+                            <div class="wallet-addr-label">DEPOSIT ADDRESS</div>
+                            <div class="wallet-addr" id="wallet-addr">—</div>
+                            <div class="wallet-bal" id="wallet-bal">0 LTC</div>
+                            <p class="wallet-tip" id="wallet-tip"></p>
+                            <button class="pixel-btn" id="wallet-refresh-btn">REFRESH</button>
+
+                            <div class="sso-box" id="sso-box">
+                                <div class="sso-login" id="sso-login-box">
+                                    <div class="wallet-addr-label">SIXZEE ACCOUNT</div>
+                                    <input class="sso-input" id="sso-email" type="email" placeholder="you@email.com" autocomplete="email">
+                                    <input class="sso-input" id="sso-pass" type="password" placeholder="password" autocomplete="current-password">
+                                    <div class="hand-actions">
+                                        <button class="pixel-btn secondary" id="sso-register">REGISTER</button>
+                                        <button class="pixel-btn" id="sso-login">LOGIN</button>
+                                    </div>
+                                    <p class="wallet-tip">One account = one custody wallet. Your seed is exportable later.</p>
+                                </div>
+                                <div class="sso-account" id="sso-account" hidden>
+                                    <div class="wallet-addr-label">CREDIT DEPOSIT ADDRESS <span class="wallet-net">ACCOUNT</span></div>
+                                    <div class="wallet-addr" id="sso-acct-addr">—</div>
+                                    <div class="pts-row">
+                                        <span class="pts-chip" id="pts-bal">0 pts</span>
+                                        <span class="pts-usd" id="pts-usd">≈ $0.00</span>
+                                    </div>
+                                    <div class="wallet-addr-label">SETTLEMENT PROVIDER</div>
+                                    <div class="provider-choice" id="provider-choice"></div>
+                                    <div class="hand-actions">
+                                        <button class="pixel-btn secondary" id="pts-claim">CLAIM POINTS</button>
+                                        <button class="pixel-btn" id="pts-play">PLAY AI FOR 20 PTS</button>
+                                    </div>
+                                    <div class="wallet-addr-label">FEES I GENERATED</div>
+                                    <div class="wallet-tip" id="pts-fees">—</div>
+                                    <div class="wallet-tip gold" id="pts-last"></div>
+                                    <button class="pixel-btn secondary sso-export" id="sso-export">EXPORT SEED</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Game table -->
+        <div id="game-screen" class="screen">
+            <div class="pixel-border">
+                <header class="game-header">
+                    <div class="table-info">
+                        <span class="table-id" id="table-id-display">TABLE #001</span>
+                        <span class="mode-badge" id="mode-badge">1v1</span>
+                        <span class="stake-badge" id="stake-badge">FREE PLAY</span>
+                    </div>
+                    <div class="connection-status">
+                        <button type="button" class="match-stats-btn" id="rules-btn" aria-label="Show Sixzee rules">📜 RULES</button>
+                        <button type="button" class="match-stats-btn" id="match-stats-btn" hidden aria-label="Open last match result and statistics">📊 STATS</button>
+                        <span class="status-dot" id="status-dot"></span>
+                        <span id="status-text">CONNECTING...</span>
+                    </div>
+                </header>
+
+                <div class="sixzee-board">
+                    <div class="board-info">
+                        <div class="player-score" id="player-scores"></div>
+                    </div>
+
+                    <div class="opponents-area" id="opponents-area"></div>
+
+                    <div class="dice-stage">
+                        <div class="dice-header">
+                            <span class="round-label" id="round-label">ROUND 1 / 13</span>
+                            <span class="turn-status" id="turn-status">ROLLING...</span>
+                            <span class="rolls-label" id="rolls-left">3 ROLLS LEFT</span>
+                        </div>
+                        <div class="dice-tray" id="dice-tray" aria-label="Six dice. Click a die to hold it."></div>
+                        <div class="dice-actions">
+                            <button class="pixel-btn action-btn" id="roll-btn" disabled>ROLL DICE</button>
+                            <span class="dice-hint">CLICK DICE TO HOLD · CLICK A CATEGORY TO SCORE</span>
+                        </div>
+                    </div>
+
+                    <div class="scorecard-wrap">
+                        <div class="scorecard" id="upper-scorecard"></div>
+                        <div class="scorecard" id="lower-scorecard"></div>
+                        <div class="score-totals" id="score-totals"></div>
+                    </div>
+                </div>
+
+                <div class="phase-indicator" id="phase-indicator">
+                    <span class="phase-label" id="phase-label">WAITING FOR PLAYERS</span>
+                    <span class="phase-sub" id="phase-sub"></span>
+                </div>
+
+                <details class="game-log" id="game-log">
+                    <summary class="log-header">Game activity</summary>
+                    <div class="log-messages" id="log-messages"></div>
+                </details>
+            </div>
+        </div>
+
+        <!-- Modal overlays -->
+        <div id="modal-overlay" class="modal-overlay hidden">
+            <div class="modal pixel-border" id="modal">
+                <div class="modal-header" id="modal-header">NOTIFICATION</div>
+                <div class="modal-content" id="modal-content"></div>
+                <div class="modal-actions" id="modal-actions"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="config.js"></script>
+    <script src="player-profile.js"></script>
+    <script src="sixzee-engine.js"></script>
+    <script src="network.js"></script>
+    <script src="game.js"></script>
+    <script src="main.js"></script>
+    <script src="wallet.js"></script>
+    <script src="metamask.js"></script>
+</body>
+</html>

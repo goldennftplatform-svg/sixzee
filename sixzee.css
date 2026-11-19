@@ -1,0 +1,293 @@
+/* SIXZEE — safari-knights 8-bit dice theme. Loaded last so it wins over the
+   shared wallet/shell styles while leaving wallet panels untouched. */
+
+:root {
+  --sixzee-ink: #06171f;
+  --sixzee-panel: rgba(6, 23, 31, 0.92);
+  --sixzee-panel-2: rgba(10, 38, 47, 0.94);
+  --sixzee-gold: #f4bb3f;
+  --sixzee-gold-dim: #b98528;
+  --sixzee-ivory: #f6ead0;
+  --sixzee-teal: #5fe0d0;
+  --sixzee-danger: #ff6a5e;
+  --sixzee-line: rgba(244, 187, 63, 0.35);
+}
+
+body {
+  background-color: var(--sixzee-ink);
+  background-image:
+    linear-gradient(180deg, rgba(3, 16, 22, 0.72), rgba(3, 16, 22, 0.94)),
+    url('assets/safari-knights-reference.jpg');
+  background-size: cover, cover;
+  background-position: center, center 35%;
+  background-attachment: fixed;
+}
+
+#game-container { max-width: 1180px; }
+
+.pixel-header .logo h1,
+.pixel-header .tagline {
+  color: var(--sixzee-ivory);
+  text-shadow: 0 0 14px rgba(244, 187, 63, 0.45);
+}
+
+.pixel-header .logo-icon { filter: drop-shadow(0 0 8px rgba(244, 187, 63, 0.6)); }
+
+.sixzee-board {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) minmax(360px, 1.35fr);
+  gap: 18px;
+  padding: 18px;
+  background: var(--sixzee-panel);
+  border: 2px solid var(--sixzee-line);
+  box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.55), 0 12px 40px rgba(0, 0, 0, 0.45);
+}
+
+.board-info,
+.opponents-area { grid-column: 1 / -1; }
+
+.player-score {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.player-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--sixzee-panel-2);
+  border: 1px solid var(--sixzee-line);
+  color: var(--sixzee-ivory);
+  font-family: 'VT323', monospace;
+  font-size: 20px;
+}
+
+.player-chip.active {
+  border-color: var(--sixzee-gold);
+  box-shadow: 0 0 16px rgba(244, 187, 63, 0.35);
+}
+
+.player-chip .seat-dot {
+  width: 10px;
+  height: 10px;
+  background: var(--chip-color, var(--sixzee-teal));
+  box-shadow: 0 0 8px var(--chip-color, var(--sixzee-teal));
+}
+
+.player-chip b { color: var(--sixzee-gold); font-size: 24px; }
+
+.opponent-card {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 8px 8px 0;
+  padding: 8px 12px;
+  border: 1px solid var(--sixzee-line);
+  background: rgba(4, 18, 25, 0.8);
+  color: var(--sixzee-ivory);
+  font-family: 'VT323', monospace;
+  font-size: 19px;
+}
+
+.opponent-card.waiting { opacity: 0.65; }
+
+.dice-stage {
+  grid-column: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  background: linear-gradient(160deg, rgba(13, 47, 55, 0.9), rgba(5, 20, 27, 0.95));
+  border: 1px dashed var(--sixzee-line);
+}
+
+.dice-header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--sixzee-ivory);
+  font-family: 'Press Start 2P', monospace;
+  font-size: 9px;
+  line-height: 1.7;
+}
+
+.dice-header .turn-status { color: var(--sixzee-gold); }
+.dice-header .rolls-label { color: var(--sixzee-teal); }
+
+.dice-tray {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(38px, 1fr));
+  gap: 8px;
+  align-items: center;
+  min-height: 76px;
+}
+
+.die {
+  position: relative;
+  aspect-ratio: 1;
+  min-width: 38px;
+  border: 3px solid var(--sixzee-ivory);
+  border-radius: 8px;
+  background: linear-gradient(145deg, #fffdf4, #d9c9a4);
+  box-shadow: 0 4px 0 #8a7448, 0 0 18px rgba(244, 187, 63, 0.18);
+  cursor: pointer;
+  padding: 8%;
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+
+.die:hover { transform: translateY(-3px); }
+
+.die.held {
+  border-color: var(--sixzee-gold);
+  box-shadow: 0 4px 0 var(--sixzee-gold-dim), 0 0 22px rgba(244, 187, 63, 0.6);
+  transform: translateY(-5px);
+}
+
+.die.locked { cursor: default; opacity: 0.72; }
+.die.locked:hover { transform: none; }
+
+.die-face {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  width: 100%;
+  height: 100%;
+}
+
+.pip {
+  align-self: center;
+  justify-self: center;
+  width: 72%;
+  height: 72%;
+  border-radius: 50%;
+  background: var(--sixzee-ink);
+  box-shadow: inset 1px 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.die.held .pip { background: #7a3f18; }
+
+.dice-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.dice-hint {
+  color: rgba(246, 234, 208, 0.75);
+  font-family: 'VT323', monospace;
+  font-size: 17px;
+}
+
+.scorecard-wrap {
+  grid-column: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.scorecard {
+  background: var(--sixzee-panel-2);
+  border: 1px solid var(--sixzee-line);
+  padding: 8px;
+}
+
+.scorecard h3 {
+  margin: 2px 0 8px;
+  color: var(--sixzee-gold);
+  font-family: 'Press Start 2P', monospace;
+  font-size: 10px;
+}
+
+.score-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+}
+
+.score-cell {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 9px;
+  margin: 2px 0;
+  border: 1px solid rgba(244, 187, 63, 0.18);
+  background: rgba(3, 16, 22, 0.72);
+  color: var(--sixzee-ivory);
+  font-family: 'VT323', monospace;
+  font-size: 18px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.score-cell:hover:not(:disabled),
+.score-cell.preview:not(:disabled) {
+  border-color: var(--sixzee-teal);
+  background: rgba(95, 224, 208, 0.12);
+}
+
+.score-cell:disabled { cursor: default; }
+.score-cell.filled { opacity: 0.85; }
+.score-cell.zero .score-value { color: var(--sixzee-danger); }
+.score-cell .score-value { color: var(--sixzee-gold); min-width: 26px; text-align: right; }
+.score-cell .preview-value { color: var(--sixzee-teal); }
+.score-cell.jackpot { border-color: rgba(244, 187, 63, 0.55); }
+
+.score-totals {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.total-box {
+  padding: 10px;
+  border: 1px solid var(--sixzee-line);
+  background: rgba(3, 16, 22, 0.8);
+  color: var(--sixzee-ivory);
+  font-family: 'VT323', monospace;
+  font-size: 17px;
+  text-align: center;
+}
+
+.total-box b {
+  display: block;
+  color: var(--sixzee-gold);
+  font-family: 'Press Start 2P', monospace;
+  font-size: 14px;
+  margin-top: 4px;
+}
+
+.phase-indicator {
+  margin: 14px 18px 0;
+}
+
+.phase-label { color: var(--sixzee-gold); }
+
+.game-log { margin: 12px 18px 18px; }
+
+.seat-portrait {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--sixzee-gold);
+}
+
+.seat-empty {
+  display: inline-grid;
+  place-items: center;
+  color: var(--sixzee-gold);
+  border-style: dashed;
+}
+
+@media (max-width: 860px) {
+  .sixzee-board { grid-template-columns: 1fr; }
+  .dice-stage, .scorecard-wrap, .board-info, .opponents-area { grid-column: 1; }
+  .dice-tray { grid-template-columns: repeat(3, 1fr); }
+  .die { max-width: 76px; }
+  .dice-header { font-size: 8px; }
+}

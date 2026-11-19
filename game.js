@@ -1,0 +1,746 @@
+/*
+ * SIXZEE — browser game controller.
+ *
+ * Owns the dice UI, 13-category scorecard, AI turns, and the same relay/wallet
+ * seams as the original LITEcrib build.
+ */
+'use strict';
+
+const SIXZEE_DIE_PIPS = {
+    1: [4],
+    2: [0, 8],
+    3: [0, 4, 8],
+    4: [0, 2, 6, 8],
+    5: [0, 2, 4, 6, 8],
+    6: [0, 2, 3, 5, 6, 8],
+};
+
+class SixzeeUI {
+    constructor() {
+        const api = window.Sixzee;
+        this.api = api;
+        this.engine = new api.SixzeeGame({ players: ['PLAYER 1', 'AI'] });
+        this.network = new GameNetwork();
+        this.localPlayerIndex = 0;
+        this.tableId = null;
+        this.isSinglePlayer = false;
+        this.isRemote = false;
+        this.remoteState = null;
+        this.aiPlayers = new Map();
+        this.aiThinking = false;
+        this.gameLog = [];
+        this.lastLogToken = '';
+
+        this.stakedMatch = null;
+        this.stakedMatchSettled = false;
+
+        this.matchStats = this.createMatchStats();
+        this.lastStatsRoundToken = null;
+        this.matchResultToken = null;
+        this.matchResultState = null;
+        this.matchResultShown = false;
+        this.matchSettlement = null;
+        this.statsScoresInitialized = false;
+        this.lastMatchMode = '1v1';
+        this.lastPlayerName = '';
+
+        this.setupNetworkListeners();
+    }
+
+    // -----------------------------------------------------------------------
+    // Match bookkeeping (kept from the full build for staking + stats)
+    // -----------------------------------------------------------------------
+    createMatchStats() {
+        return { startedAt: Date.now(), finishedAt: null, rounds: 0, players: {}, events: [] };
+    }
+
+    resetMatchStats() {
+        this.matchStats = this.createMatchStats();
+        this.lastStatsRoundToken = null;
+        this.matchResultToken = null;
+        this.matchResultState = null;
+        this.matchResultShown = false;
+        this.matchSettlement = null;
+        this.statsScoresInitialized = false;
+        this.updateMatchStatsButton();
+    }
+
+    roundToken(state) {
+        return state?.round + '|' + (state?.currentPlayer ?? 0);
+    }
+
+    trackRound(state) {
+        if (!state || state.phase === 'GAME_OVER') return;
+        const token = this.roundToken(state);
+        if (token === this.lastStatsRoundToken) return;
+        this.lastStatsRoundToken = token;
+        this.matchStats.rounds = Math.max(this.matchStats.rounds, state.round || 1);
+    }
+
+    updateMatchStatsButton() {
+        const btn = document.getElementById('match-stats-btn');
+        if (btn) btn.hidden = !this.matchResultState;
+    }
+
+    // -----------------------------------------------------------------------
+    // Network + lobby
+    // -----------------------------------------------------------------------
+    setupNetworkListeners() {
+        this.network.on('connected', () => {
+            this.updateConnectionStatus(true);
+            this.loadTables();
+        });
+        this.network.on('disconnected', () => this.updateConnectionStatus(false));
+        this.network.on('state', (state) => this.handleStateUpdate(state));
+        this.network.on('tableList', (tables) => this.renderTableList(tables));
+        this.network.on('chat', (chat) => this.addLogEntry(`${chat.playerName}: ${chat.message}`, 'system'));
+    }
+
+    async init() {
+        try {
+            await this.network.connect();
+            this.loadPlayerName();
+            this.loadTables();
+        } catch (e) {
+            console.error('Failed to connect:', e);
+            this.showModal('CONNECTION ISSUE', 'The relay could not be reached. Solo play is still available.', [
+                { text: 'OK', action: () => this.hideModal() }
+            ]);
+        }
+    }
+
+    loadPlayerName() {
+        const saved = localStorage.getItem('sixzee_player_name');
+        if (saved) document.getElementById('player-name').value = saved;
+    }
+
+    savePlayerName(name) {
+        localStorage.setItem('sixzee_player_name', name);
+    }
+
+    loadTables() {
+        this.renderTableList(this.network.getTableList());
+    }
+
+    renderTableList(tables) {
+        const grid = document.getElementById('tables-grid');
+        if (!grid) return;
+        if (!tables || tables.length === 0) {
+            grid.innerHTML = `
+                <div class="table-card empty">
+                    <div class="table-icon">🎲</div>
+                    <p>No tables yet</p>
+                    <button class="pixel-btn create-table-btn" id="create-table-btn">CREATE TABLE</button>
+                </div>`;
+            grid.querySelector('#create-table-btn')?.addEventListener('click', () => this.showCreateTableModal());
+            return;
+        }
+        grid.innerHTML = tables.map((table) => {
+            const maxPlayers = table.mode === '1v1' ? 2 : 3;
+            const count = table.players.length;
+            const isFull = count >= maxPlayers;
+            const yours = table.players.some((p) => p.id === this.network.playerId);
+            return `
+                <div class="table-card ${isFull ? 'full' : ''} ${yours ? 'current' : ''}" data-table-id="${table.id}">
+                    <div class="table-icon">${table.mode === '1v1' ? '🎲' : '🦏'}</div>
+                    <h4>${table.mode === '1v1' ? 'HEAD-TO-HEAD' : 'SAFARI TRIO'}</h4>
+                    <div class="table-meta">Table #${table.id.slice(-5).toUpperCase()}</div>
+                    <div>${yours ? 'YOUR TABLE · ' : ''}${count}/${maxPlayers} SEATED</div>
+                    <div>${isFull ? 'IN PLAY' : yours ? 'WAITING FOR PLAYERS' : 'CLICK TO SIT'}</div>
+                </div>`;
+        }).join('');
+        grid.querySelectorAll('.table-card:not(.empty):not(.full)').forEach((card) => {
+            card.addEventListener('click', () => this.joinGame(card.dataset.tableId));
+        });
+    }
+
+    showCreateTableModal() {
+        const mode = document.querySelector('.mode-card.selected')?.dataset.mode || '1v1';
+        this.showModal('CREATE TABLE', `<p>Create a ${mode === '1v1' ? 'head-to-head' : 'three-player'} Sixzee table?</p>`, [
+            { text: 'CREATE', class: 'primary', action: () => this.createTable(mode) },
+            { text: 'CANCEL', action: () => this.hideModal() }
+        ]);
+    }
+
+    async createTable(mode) {
+        const name = document.getElementById('player-name').value.trim().toUpperCase();
+        if (!name) {
+            this.showModal('ERROR', 'Enter your name first!', [{ text: 'OK', action: () => this.hideModal() }]);
+            return;
+        }
+        this.savePlayerName(name);
+        const result = await this.network.createTable(mode, name);
+        if (!result.success && !result.ok) {
+            this.showModal('TABLE UNAVAILABLE', this.escapeHtml(result.error || 'Could not create table.'), [
+                { text: 'OK', action: () => this.hideModal() }
+            ]);
+            return;
+        }
+        this.clearStakedMatch();
+        this.resetMatchStats();
+        this.isSinglePlayer = false;
+        this.aiPlayers.clear();
+        this.tableId = result.tableId;
+        this.loadTables();
+        this.hideModal();
+    }
+
+    async joinGame(tableId) {
+        const name = document.getElementById('player-name').value.trim().toUpperCase();
+        if (!name) {
+            this.showModal('ERROR', 'Enter your name first!', [{ text: 'OK', action: () => this.hideModal() }]);
+            return;
+        }
+        this.savePlayerName(name);
+        const result = await this.network.joinTable(tableId, name);
+        if (!result.success && !result.ok) {
+            this.showModal('JOIN FAILED', this.escapeHtml(result.error || 'Could not join table.'), [
+                { text: 'OK', action: () => this.hideModal() }
+            ]);
+            return;
+        }
+        this.clearStakedMatch();
+        this.resetMatchStats();
+        this.isSinglePlayer = false;
+        this.isRemote = true;
+        this.tableId = tableId;
+        this.hideModal();
+    }
+
+    // -----------------------------------------------------------------------
+    // Local + AI game setup
+    // -----------------------------------------------------------------------
+    getAIName(index) {
+        const names = ['🦁 SIMBA', '🦓 ZARA', '🦏 KIFARU', '🐘 TEMBO', '🦒 TWIGA', '🐆 CHUI'];
+        return names[(index - 1) % names.length];
+    }
+
+    setupLocalGame(mode, playerName) {
+        const count = mode === '1v1' ? 2 : 3;
+        this.lastMatchMode = mode;
+        this.lastPlayerName = playerName;
+        this.resetMatchStats();
+        this.isRemote = false;
+        this.remoteState = null;
+        this.isSinglePlayer = true;
+        this.aiThinking = false;
+        this.localPlayerIndex = 0;
+        this.aiPlayers.clear();
+        const players = [playerName.toUpperCase()];
+        for (let i = 1; i < count; i += 1) {
+            players.push(this.getAIName(i));
+            this.aiPlayers.set(i, new this.api.SixzeeAI());
+        }
+        this.engine = new this.api.SixzeeGame({ players });
+        this.gameLog = [];
+        this.addLogEntry(`${mode === '1v1' ? 'Head-to-head' : 'Three-player'} Sixzee started. Roll the dice!`, 'system');
+        this.showGameScreen();
+        this.renderGameState(this.engine.getState(this.localPlayerIndex));
+        this.maybeRunAi();
+    }
+
+    startFreeMatch(name) {
+        this.isSinglePlayer = true;
+        this.setupLocalGame(this.lastMatchMode || '1v1', name);
+    }
+
+    playAgain() {
+        const name = this.lastPlayerName || document.getElementById('player-name')?.value.trim().toUpperCase() || 'PLAYER';
+        this.hideModal();
+        if (!this.isSinglePlayer) {
+            this.createTable(this.lastMatchMode || '1v1');
+            return;
+        }
+        this.clearStakedMatch();
+        this.startFreeMatch(name);
+    }
+
+    returnToLobby() {
+        this.hideModal();
+        document.getElementById('game-screen').classList.remove('active');
+        document.getElementById('landing-screen').classList.add('active');
+        this.loadTables();
+    }
+
+    showGameScreen() {
+        document.getElementById('landing-screen').classList.remove('active');
+        document.getElementById('game-screen').classList.add('active');
+    }
+
+    // -----------------------------------------------------------------------
+    // Staking + results (same relay economy as the original build)
+    // -----------------------------------------------------------------------
+    clearStakedMatch() {
+        this.stakedMatch = null;
+        this.stakedMatchSettled = false;
+        const badge = document.getElementById('stake-badge');
+        if (badge) {
+            badge.textContent = 'FREE PLAY';
+            badge.classList.remove('staked');
+        }
+        const status = document.getElementById('status-text');
+        if (status && status.textContent === 'TOKEN MATCH') status.textContent = 'LOCAL GAME';
+    }
+
+    startStakedAiMatch(data, playerName) {
+        const match = data && data.match;
+        if (!match || !match.players || match.players.length !== 2) {
+            this.showModal('TOKEN MATCH ERROR', '<p>The escrow response was incomplete. No dice were rolled.</p>', [
+                { text: 'OK', action: () => this.hideModal() }
+            ]);
+            return;
+        }
+        this.clearStakedMatch();
+        this.stakedMatch = {
+            id: match.id,
+            humanId: match.players[0].id,
+            aiId: match.players[1].id,
+            stake: data.stake || null,
+            ai: data.ai || null
+        };
+        const stake = data.stake || { entryPoints: 20, potPoints: 40, feePoints: 0.1, winnerPoints: 39.9, testLtcPerEntry: 0.02 };
+        const badge = document.getElementById('stake-badge');
+        if (badge) {
+            badge.textContent = '🪙 ' + stake.entryPoints + ' TEST PTS / ' + stake.testLtcPerEntry + ' tLTC';
+            badge.classList.add('staked');
+        }
+        this.setupLocalGame('1v1', playerName);
+        const status = document.getElementById('status-text');
+        if (status) status.textContent = 'TOKEN MATCH';
+        this.addLogEntry('Token match armed: ' + stake.entryPoints + ' test pts each. Winner takes ' + stake.winnerPoints + ' pts.', 'system');
+        this.showModal('YOU ARE PLAYING FOR TOKENS', `
+            <p><strong>Stake:</strong> ${stake.entryPoints} test pts (${stake.testLtcPerEntry} tLTC) each.</p>
+            <p><strong>Pot:</strong> ${stake.potPoints} pts · <strong>House fee:</strong> ${stake.feePoints} pts · <strong>Winner gets:</strong> ${stake.winnerPoints} pts.</p>
+            <p>Test tokens have no cash value.</p>
+        `, [{ text: 'ROLL DICE', class: 'primary', action: () => this.hideModal() }]);
+    }
+
+    async finishStakedMatch(state, force = false) {
+        if (!this.stakedMatch) return;
+        if (this.stakedMatchSettled && !force) return;
+        if (!state || state.phase !== 'GAME_OVER' || state.winner == null) return;
+        this.stakedMatchSettled = true;
+
+        const winnerId = state.winner === 0 ? this.stakedMatch.humanId
+            : state.winner === 1 ? this.stakedMatch.aiId : null;
+        if (!winnerId) {
+            this.setSettlementError('No winning seat was reported.');
+            return;
+        }
+        const relay = String(window.location.origin).replace(/\/$/, '');
+        let token = '';
+        try { token = localStorage.getItem('sixzee_auth_token') || ''; } catch (e) {}
+        if (!token) {
+            this.stakedMatchSettled = false;
+            this.setSettlementError('Sign in to settle this test-token match.');
+            return;
+        }
+        try {
+            const response = await fetch(relay + '/api/games/match/' + encodeURIComponent(this.stakedMatch.id) + '/resolve', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+                body: JSON.stringify({ winnerId })
+            });
+            const result = await response.json();
+            if (!response.ok || !result.success) throw new Error(result?.error || 'settlement failed');
+            const match = result.match;
+            const humanWon = match.winnerRole ? match.winnerRole !== 'ai' : match.winner === this.stakedMatch.humanId;
+            const cfg = window.SIXZEE_CONFIG || {};
+            const perLtc = (cfg.pricing && cfg.pricing.pointsPerTestLtc) || cfg.pointsPerTestLtc || 1000;
+            const tLtc = (match.payout / perLtc).toFixed(3).replace(/0+$/, '').replace(/\.$/, '');
+            this.matchSettlement = { status: 'settled', payout: match.payout, fee: match.fee, pot: match.pot, tLtc, humanWon };
+            this.addLogEntry(humanWon
+                ? 'Settled: you won ' + match.payout + ' test pts (' + tLtc + ' tLTC).'
+                : 'Settled: AI bankroll won ' + match.payout + ' pts.', 'system');
+            window.dispatchEvent(new CustomEvent('sixzee:settled', { detail: result }));
+            this.refreshVisibleResult();
+        } catch (e) {
+            this.stakedMatchSettled = false;
+            this.setSettlementError(e.message || 'network error');
+        }
+    }
+
+    setSettlementError(message) {
+        this.matchSettlement = { status: 'error', error: String(message || 'Settlement failed') };
+        this.refreshVisibleResult();
+    }
+
+    refreshVisibleResult() {
+        this.updateMatchStatsButton();
+        const overlay = document.getElementById('modal-overlay');
+        const header = document.getElementById('modal-header');
+        if (overlay && header && !overlay.classList.contains('hidden') && header.textContent === 'MATCH RESULT') {
+            this.renderMatchResultModal();
+        }
+    }
+
+    showMatchResult(state) {
+        if (!state || state.phase !== 'GAME_OVER' || state.winner == null) return;
+        const token = state.winner + '|' + (state.scores || []).join(',');
+        if (this.matchResultToken === token) return;
+        this.matchResultToken = token;
+        this.matchResultShown = true;
+        this.matchStats.finishedAt = Date.now();
+        this.matchResultState = {
+            phase: 'GAME_OVER',
+            winner: state.winner,
+            scores: [...(state.scores || [])],
+            players: (state.players || []).map((p) => ({ name: p.name, score: p.score?.total ?? p.score ?? 0 }))
+        };
+        this.updateMatchStatsButton();
+        this.renderMatchResultModal();
+        if (this.stakedMatch && !this.stakedMatchSettled) {
+            this.matchSettlement = { status: 'settling' };
+            this.finishStakedMatch(this.matchResultState);
+        }
+    }
+
+    buildResultCardHtml(state) {
+        const winner = state.players[state.winner];
+        const rows = state.players.map((p, i) => `
+            <div class="score-row">
+                <span>${i === state.winner ? '👑 ' : ''}${this.escapeHtml(p.name)}</span>
+                <b>${p.score}</b>
+            </div>`).join('');
+        let settlement = '';
+        if (this.matchSettlement) {
+            if (this.matchSettlement.status === 'settled') {
+                settlement = `<p class="wallet-tip gold">Payout: ${this.matchSettlement.payout} test pts (${this.matchSettlement.tLtc} tLTC).</p>`;
+            } else if (this.matchSettlement.status === 'error') {
+                settlement = `<p class="wallet-tip">Settlement: ${this.escapeHtml(this.matchSettlement.error)}</p>`;
+            } else {
+                settlement = '<p class="wallet-tip">Settling test-token payout…</p>';
+            }
+        }
+        return `<p><strong>${this.escapeHtml(winner?.name || 'WINNER')}</strong> takes the board.</p>${rows}${settlement}`;
+    }
+
+    buildStatsHtml(state) {
+        const rows = state.players.map((p, i) => `
+            <div class="score-row"><span>${this.escapeHtml(p.name)}</span><b>${p.score}</b></div>`).join('');
+        return `<p>Rounds played: ${this.matchStats.rounds || state.players[0]?.score?.filled || 0} / 13</p>${rows}`;
+    }
+
+    renderMatchResultModal() {
+        if (!this.matchResultState) return;
+        const needsRetry = this.stakedMatch && this.matchSettlement?.status === 'error';
+        const actions = [];
+        if (needsRetry) {
+            actions.push({ text: 'RETRY PAYOUT', class: 'primary', action: () => this.finishStakedMatch(this.matchResultState, true) });
+        }
+        actions.push(
+            { text: this.isSinglePlayer ? 'REMATCH' : 'NEW TABLE', class: needsRetry ? '' : 'primary', action: () => this.playAgain() },
+            { text: 'VIEW STATS', action: () => this.showMatchStats() },
+            { text: 'BACK TO LOBBY', action: () => this.returnToLobby() }
+        );
+        this.showModal('MATCH RESULT', this.buildResultCardHtml(this.matchResultState), actions, { className: 'result-modal' });
+    }
+
+    showMatchStats() {
+        const state = this.matchResultState || this.getCurrentState();
+        const finished = Boolean(this.matchResultState);
+        this.showModal(finished ? 'MATCH STATS' : 'MATCH STATS · LIVE', this.buildStatsHtml(state), [
+            { text: finished ? (this.isSinglePlayer ? 'REMATCH' : 'NEW TABLE') : 'BACK TO GAME', class: 'primary', action: () => finished ? this.playAgain() : this.hideModal() },
+            { text: finished ? 'BACK TO RESULT' : 'CLOSE', action: () => finished ? this.renderMatchResultModal() : this.hideModal() }
+        ], { className: 'stats-modal' });
+    }
+
+    showLastMatchResult() {
+        if (this.matchResultState) this.renderMatchResultModal();
+        else this.showMatchStats();
+    }
+
+    showRules() {
+        this.showModal('SIXZEE RULES', `
+            <p><strong>6 dice. 3 rolls. 13 categories.</strong> Roll, click dice to hold, then click a scorecard category.</p>
+            <p><strong>Upper:</strong> Ones–Sixes score face value × count. Reach <strong>84</strong> for a <strong>+35 bonus</strong>.</p>
+            <p><strong>Lower:</strong> 3-of-a-kind / 4-of-a-kind score all six dice; 5-of-a-kind = 45; SIXZEE (six of a kind) = 60; Full House (3+3) = 30; Small Straight (4 in a row) = 30; Large Straight (5 in a row) = 40.</p>
+            <p>A roll that does not fit a category scores zero and closes it. Highest total wins.</p>
+        `, [{ text: 'GOT IT', class: 'primary', action: () => this.hideModal() }]);
+    }
+
+    // -----------------------------------------------------------------------
+    // State flow + rendering
+    // -----------------------------------------------------------------------
+    getCurrentState() {
+        if (this.isRemote && this.remoteState) return this.remoteState;
+        return this.engine.getState(this.localPlayerIndex);
+    }
+
+    handleStateUpdate(state) {
+        if (!state) return;
+        if (state.phase === 'WAITING') return;
+        this.isRemote = true;
+        this.remoteState = state;
+        this.showGameScreen();
+        this.renderGameState(state);
+        if (state.phase === 'GAME_OVER') this.showMatchResult(state);
+    }
+
+    renderGameState(state) {
+        this.trackRound(state);
+        const tableId = document.getElementById('table-id-display');
+        if (tableId) tableId.textContent = this.isRemote ? `TABLE #${String(this.tableId || '').slice(-5).toUpperCase()}` : 'LOCAL SIXZEE';
+        const badge = document.getElementById('mode-badge');
+        if (badge) badge.textContent = this.isSinglePlayer ? 'VS AI' : 'MULTIPLAYER';
+
+        this.renderPlayerChips(state);
+        this.renderOpponents(state);
+        this.renderDice(state);
+        this.renderScorecards(state);
+        this.renderStatus(state);
+    }
+
+    renderPlayerChips(state) {
+        const host = document.getElementById('player-scores');
+        if (!host) return;
+        const colors = ['#f4bb3f', '#5fe0d0', '#ff8fb1'];
+        host.innerHTML = state.players.map((p, i) => `
+            <div class="player-chip ${i === state.currentPlayer ? 'active' : ''}" style="--chip-color:${colors[i % colors.length]}">
+                <span class="seat-dot"></span>
+                ${this.escapeHtml(p.name)}
+                <b>${p.score?.total ?? 0}</b>
+            </div>`).join('');
+    }
+
+    renderOpponents(state) {
+        const host = document.getElementById('opponents-area');
+        if (!host) return;
+        const others = state.players
+            .map((p, index) => ({ player: p, index }))
+            .filter((entry) => entry.index !== state.yourIndex);
+        host.innerHTML = others.map(({ player, index }) => `
+            <div class="opponent-card ${index === state.currentPlayer ? 'active' : 'waiting'}">
+                ${this.escapeHtml(player.name)} · ${player.score?.total ?? 0} pts · ${player.score?.filled ?? 0}/13
+            </div>`).join('');
+    }
+
+    renderDice(state) {
+        const tray = document.getElementById('dice-tray');
+        if (!tray) return;
+        const beforeFirstRoll = state.rollsLeft === 3 && state.phase !== 'GAME_OVER';
+        const canHold = state.isYourTurn && !beforeFirstRoll && state.rollsLeft > 0 && state.phase !== 'GAME_OVER';
+        tray.innerHTML = state.dice.map((die, index) => {
+            const held = Boolean(die.held);
+            const pips = beforeFirstRoll ? [] : (SIXZEE_DIE_PIPS[die.value] || []);
+            const face = Array.from({ length: 9 }, (_, cell) => (
+                pips.includes(cell) ? '<span class="pip"></span>' : '<span></span>'
+            )).join('');
+            return `<button type="button" class="die ${held ? 'held' : ''} ${canHold ? '' : 'locked'}"
+                        data-die-index="${index}" aria-label="Die ${index + 1}${held ? ', held' : ''}" ${canHold ? '' : 'disabled'}>
+                        <span class="die-face">${face}</span>
+                    </button>`;
+        }).join('');
+        tray.querySelectorAll('.die:not(.locked)').forEach((el) => {
+            el.addEventListener('click', () => this.toggleHold(Number(el.dataset.dieIndex)));
+        });
+
+        const rolls = document.getElementById('rolls-left');
+        if (rolls) rolls.textContent = state.phase === 'GAME_OVER' ? 'GAME OVER' : `${state.rollsLeft} ROLL${state.rollsLeft === 1 ? '' : 'S'} LEFT`;
+        const round = document.getElementById('round-label');
+        if (round) round.textContent = `ROUND ${Math.min(state.round, 13)} / 13`;
+        const rollBtn = document.getElementById('roll-btn');
+        if (rollBtn) {
+            rollBtn.disabled = !(state.isYourTurn && state.rollsLeft > 0 && state.phase !== 'GAME_OVER');
+            rollBtn.textContent = state.rollsLeft === 3 ? 'ROLL DICE' : `ROLL (${state.rollsLeft} LEFT)`;
+        }
+    }
+
+    renderScorecards(state) {
+        const card = state.players[state.yourIndex]?.scorecard || {};
+        const canScore = state.isYourTurn && state.rollsLeft < 3 && state.phase !== 'GAME_OVER';
+        const options = canScore ? this.api.scoreOptions(state.dice.map((d) => d.value), card) : {};
+        const cats = this.api.CATEGORIES;
+        const upper = cats.filter((c) => c.group === 'upper');
+        const lower = cats.filter((c) => c.group === 'lower');
+
+        const row = (cat) => {
+            const value = card[cat.id];
+            const filled = value !== null && value !== undefined;
+            const preview = options[cat.id];
+            const cls = [
+                'score-cell',
+                filled ? 'filled' : '',
+                filled && value === 0 ? 'zero' : '',
+                !filled && canScore ? 'preview' : '',
+                cat.id === 'sixzee' ? 'jackpot' : ''
+            ].join(' ');
+            const shown = filled ? value : (canScore && preview != null ? `<span class="preview-value">${preview}</span>` : '—');
+            return `<button type="button" class="${cls}" data-category="${cat.id}" ${filled || !canScore ? 'disabled' : ''}>
+                        <span>${cat.label}</span><span class="score-value">${shown}</span>
+                    </button>`;
+        };
+
+        const upperHost = document.getElementById('upper-scorecard');
+        const lowerHost = document.getElementById('lower-scorecard');
+        if (upperHost) upperHost.innerHTML = `<h3>UPPER SECTION</h3>${upper.map(row).join('')}`;
+        if (lowerHost) lowerHost.innerHTML = `<h3>LOWER SECTION</h3>${lower.map(row).join('')}`;
+        document.querySelectorAll('.score-cell[data-category]:not(:disabled)').forEach((el) => {
+            el.addEventListener('click', () => this.scoreCategory(el.dataset.category));
+        });
+
+        const score = state.players[state.yourIndex]?.score || this.api.scoreCard(card);
+        const totals = document.getElementById('score-totals');
+        if (totals) {
+            totals.innerHTML = `
+                <div class="total-box">UPPER<b>${score.upperSubtotal}</b></div>
+                <div class="total-box">BONUS<b>${score.bonus} / 35</b></div>
+                <div class="total-box">LOWER<b>${score.lowerSubtotal}</b></div>
+                <div class="total-box">TOTAL<b>${score.total}</b></div>`;
+        }
+    }
+
+    renderStatus(state) {
+        const turn = document.getElementById('turn-status');
+        const phase = document.getElementById('phase-label');
+        const sub = document.getElementById('phase-sub');
+        const yourTurn = Boolean(state.isYourTurn);
+        if (turn) turn.textContent = state.phase === 'GAME_OVER'
+            ? 'GAME OVER'
+            : yourTurn ? 'YOUR TURN' : `${state.players[state.currentPlayer]?.name || 'OPPONENT'}'S TURN`;
+        if (phase) phase.textContent = state.phase === 'GAME_OVER' ? 'FINAL SCORE' : `ROUND ${state.round} OF 13`;
+        if (sub) sub.textContent = state.phase === 'GAME_OVER'
+            ? 'Highest total wins' : yourTurn ? 'Hold dice, reroll, then choose a category' : 'Waiting for the other player…';
+    }
+
+    // -----------------------------------------------------------------------
+    // Player actions
+    // -----------------------------------------------------------------------
+    async rollAction() {
+        const state = this.getCurrentState();
+        if (!state.isYourTurn || state.rollsLeft <= 0 || state.phase === 'GAME_OVER') return;
+        if (this.isRemote) {
+            await this.network.sendGameAction('roll');
+            return;
+        }
+        this.engine.roll();
+        this.renderGameState(this.engine.getState(this.localPlayerIndex));
+    }
+
+    async toggleHold(index) {
+        const state = this.getCurrentState();
+        if (!state.isYourTurn || state.rollsLeft === 3 || state.rollsLeft <= 0 || state.phase === 'GAME_OVER') return;
+        if (this.isRemote) {
+            const mask = state.dice.reduce((acc, die, i) => (
+                acc | ((i === index ? !die.held : die.held) ? (1 << i) : 0)
+            ), 0);
+            await this.network.sendGameAction('holds', { mask });
+            return;
+        }
+        this.engine.toggleHold(index);
+        this.renderGameState(this.engine.getState(this.localPlayerIndex));
+    }
+
+    async scoreCategory(categoryId) {
+        const state = this.getCurrentState();
+        if (!state.isYourTurn || state.rollsLeft === 3 || state.phase === 'GAME_OVER') return;
+        if (this.isRemote) {
+            await this.network.sendGameAction('score', { categoryId });
+            return;
+        }
+        const points = this.engine.score(categoryId);
+        const name = state.players[state.yourIndex]?.name || 'YOU';
+        this.addLogEntry(`${name} scored ${points} in ${this.api.CATEGORIES.find((c) => c.id === categoryId)?.label || categoryId}.`, 'score');
+        const fresh = this.engine.getState(this.localPlayerIndex);
+        this.renderGameState(fresh);
+        if (fresh.phase === 'GAME_OVER') this.showMatchResult(fresh);
+        else this.maybeRunAi();
+    }
+
+    async maybeRunAi() {
+        if (this.isRemote || this.aiThinking) return;
+        let state = this.engine.getState(this.localPlayerIndex);
+        if (state.phase === 'GAME_OVER' || !this.aiPlayers.has(state.currentPlayer)) return;
+        this.aiThinking = true;
+        try {
+            while (state.phase !== 'GAME_OVER' && this.aiPlayers.has(state.currentPlayer)) {
+                const index = state.currentPlayer;
+                const ai = this.aiPlayers.get(index);
+                const name = this.engine.players[index].name;
+                await new Promise((resolve) => setTimeout(resolve, 450));
+                this.engine.roll();
+                if (this.engine.rollsLeft > 0) {
+                    const holds = ai.chooseHolds(this.engine.dice.map((d) => d.value), this.engine.player.scorecard, this.engine.rollsLeft);
+                    this.engine.setHolds(holds.reduce((mask, held, i) => mask | (held ? (1 << i) : 0), 0));
+                    await new Promise((resolve) => setTimeout(resolve, 400));
+                    this.engine.roll();
+                }
+                if (this.engine.rollsLeft > 0) {
+                    const holds = ai.chooseHolds(this.engine.dice.map((d) => d.value), this.engine.player.scorecard, this.engine.rollsLeft);
+                    this.engine.setHolds(holds.reduce((mask, held, i) => mask | (held ? (1 << i) : 0), 0));
+                    await new Promise((resolve) => setTimeout(resolve, 400));
+                    this.engine.roll();
+                }
+                const category = ai.chooseCategory(this.engine.dice.map((d) => d.value), this.engine.player.scorecard);
+                const points = this.engine.score(category);
+                this.addLogEntry(`${name} scored ${points} in ${this.api.CATEGORIES.find((c) => c.id === category)?.label || category}.`, 'score');
+                state = this.engine.getState(this.localPlayerIndex);
+                this.renderGameState(state);
+            }
+            if (state.phase === 'GAME_OVER') this.showMatchResult(state);
+        } finally {
+            this.aiThinking = false;
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Utilities
+    // -----------------------------------------------------------------------
+    addLogEntry(message, type = 'system') {
+        this.gameLog.push({ message, type, at: Date.now() });
+        if (this.gameLog.length > 80) this.gameLog.shift();
+        const host = document.getElementById('log-messages');
+        if (host) {
+            host.innerHTML = this.gameLog.slice(-30).reverse().map((entry) => (
+                `<div class="log-message ${entry.type}">${this.escapeHtml(entry.message)}</div>`
+            )).join('');
+        }
+    }
+
+    updateConnectionStatus(connected) {
+        const dot = document.getElementById('status-dot');
+        const text = document.getElementById('status-text');
+        const status = this.network.getConnectionStatus();
+        if (dot) dot.classList.toggle('connected', Boolean(connected));
+        if (text && !this.stakedMatch) {
+            text.textContent = connected
+                ? (status.mode === 'relay' ? 'RELAY CONNECTED' : 'SOLO MODE')
+                : 'OFFLINE';
+        }
+    }
+
+    showModal(title, content, actions = [], options = {}) {
+        const overlay = document.getElementById('modal-overlay');
+        const modal = document.getElementById('modal');
+        if (!overlay || !modal) return;
+        document.getElementById('modal-header').textContent = title;
+        document.getElementById('modal-content').innerHTML = content;
+        const host = document.getElementById('modal-actions');
+        host.innerHTML = '';
+        (actions || []).forEach((action) => {
+            const btn = document.createElement('button');
+            btn.className = 'pixel-btn' + (action.class ? ' ' + action.class : '');
+            btn.textContent = action.text;
+            btn.addEventListener('click', () => action.action?.());
+            host.appendChild(btn);
+        });
+        modal.className = 'modal pixel-border' + (options.className ? ' ' + options.className : '');
+        overlay.classList.remove('hidden');
+    }
+
+    hideModal() {
+        document.getElementById('modal-overlay')?.classList.add('hidden');
+    }
+
+    escapeHtml(text) {
+        return String(text ?? '').replace(/[&<>"']/g, (char) => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
+        })[char]);
+    }
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { SixzeeUI };
+} else {
+    window.SixzeeUI = SixzeeUI;
+}

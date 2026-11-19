@@ -1,0 +1,20 @@
+name: Sixzee static smoke test
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+jobs:
+  static-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node tests/scoring.cjs && node tests/metamask.cjs
+      - name: Check Pages bundle references
+        run: |
+          grep -q 'sixzee-engine.js' index.html
+          grep -q 'sixzee.css' index.html
+          test -f assets/safari-knights-reference.jpg

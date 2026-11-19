@@ -1,0 +1,20 @@
+{
+  "name": "sixzee-wallet-ui",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "contract": "node contract-build.mjs",
+    "build": "esbuild src.jsx --bundle --splitting --format=esm --minify --outdir=../wallet-assets --entry-names=wallet --define:process.env.NODE_ENV=\"\\\"production\\\"\""
+  },
+  "dependencies": {
+    "@privy-io/react-auth": "3.47.0",
+    "@solana-program/system": "0.8.0",
+    "@solana-program/token": "0.6.0",
+    "@solana-program/memo": "0.8.0",
+    "@solana/kit": "3.0.3",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "viem": "2.38.5"
+  },
+  "devDependencies": { "esbuild": "0.25.10", "solc": "0.8.30", "ganache": "7.9.2" }
+}
