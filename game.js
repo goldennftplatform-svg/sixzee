@@ -163,8 +163,8 @@ class SixzeeUI {
                     <div class="table-icon">${this.modeIcon(table.mode)}</div>
                     <h4>${this.modeLabel(table.mode)}</h4>
                     <div class="table-meta">Table #${table.id.slice(-5).toUpperCase()}</div>
-                    <div>${yours ? 'YOUR TABLE · ' : ''}${count}/${maxPlayers} SEATED</div>
-                    <div>${isFull ? 'IN PLAY' : yours ? 'WAITING FOR PLAYERS' : 'CLICK TO SIT'}</div>
+                    <div>${yours ? 'YOUR TABLE · ' : ''}${count}/${maxPlayers} HUMANS SEATED</div>
+                    <div>${isFull ? 'IN PLAY · NO AI' : yours ? `WAITING FOR ${maxPlayers - count} MORE HUMAN${maxPlayers - count === 1 ? '' : 'S'}` : 'CLICK TO SIT'}</div>
                 </div>`;
         }).join('');
         grid.querySelectorAll('.table-card:not(.empty):not(.full)').forEach((card) => {
@@ -174,7 +174,11 @@ class SixzeeUI {
 
     showCreateTableModal() {
         const mode = document.querySelector('.mode-card.selected')?.dataset.mode || '1v1';
-        this.showModal('CREATE TABLE', `<p>Create a ${this.modeLabel(mode).toLowerCase()} Sixzee table?</p>`, [
+        const seats = this.modeSeats(mode);
+        this.showModal('CREATE TABLE', `
+            <p>Create a <strong>${seats}-player human table</strong>?</p>
+            <p>No AI opponents. The match starts automatically when all ${seats} seats are filled.</p>
+        `, [
             { text: 'CREATE', class: 'primary', action: () => this.createTable(mode) },
             { text: 'CANCEL', action: () => this.hideModal() }
         ]);
