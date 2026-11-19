@@ -102,15 +102,60 @@ class SixzeeUI {
 
     async init() {
         try {
+            this.setupLobbyControls();
             await this.network.connect();
             this.loadPlayerName();
             this.loadTables();
+            // A friend can share a direct "take this seat" link (?table=id).
+            const inviteId = new URLSearchParams(location.search).get('table');
+            if (inviteId) {
+                this.pendingInviteTable = inviteId;
+                const saved = localStorage.getItem('sixzee_player_name');
+                if (saved) {
+                    this.joinGame(inviteId);
+                } else {
+                    document.getElementById('player-name')?.focus();
+                    this.showModal('INVITED TO A TABLE', '<p>Enter your name, then press <strong>JOIN SIXZEE</strong> to take your seat.</p>', [
+                        { text: 'OK', action: () => this.hideModal() }
+                    ]);
+                }
+            }
         } catch (e) {
             console.error('Failed to connect:', e);
             this.showModal('CONNECTION ISSUE', 'The relay could not be reached. Solo play is still available.', [
                 { text: 'OK', action: () => this.hideModal() }
             ]);
         }
+    }
+
+    setupLobbyControls() {
+        document.getElementById('lobby-ready-btn')?.addEventListener('click', () => {
+            const state = this.tableLobbyState;
+            const you = state?.players?.[state.yourIndex];
+            if (this.network.setReady) this.network.setReady(!(you?.ready));
+        });
+        document.getElementById('lobby-leave-btn')?.addEventListener('click', async () => {
+            if (this.network.leaveTable) await this.network.leaveTable();
+            this.tableLobbyState = null;
+            this.returnToLobby();
+        });
+        document.getElementById('lobby-invite-btn')?.addEventListener('click', async () => {
+            const id = this.tableLobbyState?.tableId || this.tableId || '';
+            const base = this.network.getServerUrl?.() || location.origin;
+            const link = `${base}/?table=${encodeURIComponent(id)}`;
+            let copied = false;
+            try {
+                await navigator.clipboard.writeText(link);
+                copied = true;
+            } catch (e) {
+                copied = false;
+            }
+            this.showModal('INVITE A FRIEND', `
+                <p>Send this link so a friend takes a seat at your table:</p>
+                <p style="word-break:break-all;font-family:monospace">${this.escapeHtml(link)}</p>
+                <p>${copied ? 'Link copied to your clipboard.' : 'Copy the link above and share it.'}</p>
+            `, [{ text: 'OK', class: 'primary', action: () => this.hideModal() }]);
+        });
     }
 
     loadPlayerName() {
@@ -157,14 +202,22 @@ class SixzeeUI {
             const maxPlayers = this.modeSeats(table.mode);
             const count = table.players.length;
             const isFull = count >= maxPlayers;
+            const ready = table.players.filter((p) => p.ready).length;
             const yours = table.players.some((p) => p.id === this.network.playerId);
+            const status = isFull && ready === maxPlayers
+                ? 'IN PLAY · NO AI'
+                : isFull
+                    ? `${ready}/${maxPlayers} READY · NO AI`
+                    : yours
+                        ? `YOUR TABLE · WAITING FOR ${maxPlayers - count} MORE`
+                        : 'CLICK TO SIT';
             return `
-                <div class="table-card ${isFull ? 'full' : ''} ${yours ? 'current' : ''}" data-table-id="${table.id}">
+                <div class="table-card ${isFull && ready === maxPlayers ? 'full' : ''} ${yours ? 'current' : ''}" data-table-id="${table.id}">
                     <div class="table-icon">${this.modeIcon(table.mode)}</div>
                     <h4>${this.modeLabel(table.mode)}</h4>
                     <div class="table-meta">Table #${table.id.slice(-5).toUpperCase()}</div>
-                    <div>${yours ? 'YOUR TABLE · ' : ''}${count}/${maxPlayers} HUMANS SEATED</div>
-                    <div>${isFull ? 'IN PLAY · NO AI' : yours ? `WAITING FOR ${maxPlayers - count} MORE HUMAN${maxPlayers - count === 1 ? '' : 'S'}` : 'CLICK TO SIT'}</div>
+                    <div>${count}/${maxPlayers} SEATED · ${ready} READY</div>
+                    <div>${status}</div>
                 </div>`;
         }).join('');
         grid.querySelectorAll('.table-card:not(.empty):not(.full)').forEach((card) => {
@@ -177,7 +230,7 @@ class SixzeeUI {
         const seats = this.modeSeats(mode);
         this.showModal('CREATE TABLE', `
             <p>Create a <strong>${seats}-player human table</strong>?</p>
-            <p>No AI opponents. The match starts automatically when all ${seats} seats are filled.</p>
+            <p>No AI opponents. You will sit at the table, invite friends, and everyone presses <strong>READY UP</strong> before the dice roll.</p>
         `, [
             { text: 'CREATE', class: 'primary', action: () => this.createTable(mode) },
             { text: 'CANCEL', action: () => this.hideModal() }
@@ -226,6 +279,7 @@ class SixzeeUI {
         this.isSinglePlayer = false;
         this.isRemote = true;
         this.tableId = tableId;
+        this.pendingInviteTable = null;
         this.hideModal();
     }
 
@@ -238,6 +292,7 @@ class SixzeeUI {
     }
 
     setupLocalGame(mode, playerName) {
+        this.hideTableLobby();
         const count = this.modeSeats(mode);
         this.lastMatchMode = mode;
         this.lastPlayerName = playerName;
@@ -279,6 +334,7 @@ class SixzeeUI {
 
     returnToLobby() {
         this.hideModal();
+        this.hideTableLobby();
         document.getElementById('game-screen').classList.remove('active');
         document.getElementById('landing-screen').classList.add('active');
         this.loadTables();
@@ -497,12 +553,82 @@ class SixzeeUI {
 
     handleStateUpdate(state) {
         if (!state) return;
-        if (state.phase === 'WAITING') return;
+        if (state.phase === 'WAITING') {
+            this.showTableLobby(state);
+            return;
+        }
         this.isRemote = true;
         this.remoteState = state;
+        this.hideTableLobby();
         this.showGameScreen();
         this.renderGameState(state);
         if (state.phase === 'GAME_OVER') this.showMatchResult(state);
+    }
+
+    showTableLobby(state) {
+        // Waiting room: everyone can see the seats and who is ready. The game
+        // screen stays parked until every seat is taken and ready.
+        this.tableLobbyState = state;
+        this.isRemote = true;
+        this.tableId = state.tableId || this.tableId;
+        this.showGameScreen();
+        const lobby = document.getElementById('table-lobby');
+        if (!lobby) return;
+        lobby.hidden = false;
+        document.querySelector('.sixzee-board')?.classList.add('lobby-hidden');
+        document.getElementById('phase-indicator')?.classList.add('lobby-hidden');
+        document.getElementById('game-log')?.classList.add('lobby-hidden');
+
+        const maxPlayers = state.maxPlayers || (state.players ? state.players.length : 2);
+        const yourIndex = Number(state.yourIndex) || 0;
+        const you = state.players?.[yourIndex];
+        const readyCount = state.players?.filter(p => p.ready).length || 0;
+        const filled = state.players?.length || 0;
+        const title = document.getElementById('lobby-title');
+        if (title) title.textContent = `${this.modeLabel(state.mode || '1v1')} · TABLE #${String(this.tableId || '').slice(-5).toUpperCase()}`;
+        const sub = document.getElementById('lobby-sub');
+        if (sub) sub.textContent = `Seats ${filled}/${maxPlayers} · Ready ${readyCount}/${maxPlayers} — the dice roll when everyone is ready.`;
+
+        const seatsHost = document.getElementById('lobby-seats');
+        if (seatsHost) {
+            const colors = ['#f4bb3f', '#5fe0d0', '#ff8fb1', '#a6d86b', '#c58bff', '#ff9d5c'];
+            let html = '';
+            for (let i = 0; i < maxPlayers; i += 1) {
+                const p = state.players?.[i];
+                const isYou = i === yourIndex;
+                if (!p) {
+                    html += `<div class="lobby-seat empty"><span class="seat-num">${i + 1}</span><span class="seat-name">OPEN SEAT</span><span class="seat-ready">WAITING</span></div>`;
+                    continue;
+                }
+                html += `<div class="lobby-seat ${p.ready ? 'ready' : ''} ${isYou ? 'you' : ''}" style="--chip-color:${colors[i % colors.length]}">
+                    <span class="seat-num">${i + 1}</span>
+                    <span class="seat-name">${this.escapeHtml(p.name)}${isYou ? ' (YOU)' : ''}</span>
+                    <span class="seat-ready">${p.ready ? '✓ READY' : 'NOT READY'}</span>
+                </div>`;
+            }
+            seatsHost.innerHTML = html;
+        }
+
+        const readyBtn = document.getElementById('lobby-ready-btn');
+        if (readyBtn) {
+            readyBtn.textContent = you?.ready ? 'UNREADY' : 'READY UP';
+            readyBtn.classList.toggle('is-ready', !!you?.ready);
+        }
+        const status = document.getElementById('lobby-status');
+        if (status) {
+            if (state.canStart) status.textContent = 'ALL SEATS READY — DEALING IN…';
+            else if (filled < maxPlayers) status.textContent = `Waiting for ${maxPlayers - filled} more player${maxPlayers - filled === 1 ? '' : 's'} to take a seat.`;
+            else status.textContent = `${maxPlayers - readyCount} player${maxPlayers - readyCount === 1 ? ' still needs' : 's still need'} to ready up.`;
+        }
+    }
+
+    hideTableLobby() {
+        this.tableLobbyState = null;
+        const lobby = document.getElementById('table-lobby');
+        if (lobby) lobby.hidden = true;
+        document.querySelector('.sixzee-board')?.classList.remove('lobby-hidden');
+        document.getElementById('phase-indicator')?.classList.remove('lobby-hidden');
+        document.getElementById('game-log')?.classList.remove('lobby-hidden');
     }
 
     renderGameState(state) {

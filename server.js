@@ -10,7 +10,10 @@
  *        recovered lobby catches up.
  *  - GET  /api/tables                        -> current table registry
  *  - POST /api/tables/                       -> {mode, name} creates a table
- *  - POST /api/tables/:id/join               -> {name} joins
+ *  - POST /api/tables/:id/join               -> {name} joins (sits, not ready)
+ *  - POST /api/tables/:id/ready              -> {playerId, ready} raises/lowers a hand;
+ *                                               the dice start only when every
+ *                                               seat is filled AND ready
  *  - POST /api/tables/:id/leave              -> {playerId} leaves
  *  - POST /api/tables/:id/state              -> {playerId, state} stores + broadcasts
  *  - POST /api/tables/:id/chat               -> {playerId, name, message} broadcasts
@@ -130,13 +133,34 @@ function broadcastTables() {
     streams.forEach((s) => sendSse(s.res, 'tableList', list));
 }
 
+// A per-viewer state snapshot. While the game has not started we decorate the
+// WAITING state with the seat roster (id + ready flag) so every device renders
+// the same waiting room: "sit down, see who is here, ready up".
+function stateForPlayer(table, viewerIndex) {
+    const state = table.engine.getState(viewerIndex);
+    if (state.phase === 'WAITING') {
+        const maxPlayers = seatCountForMode(table.mode);
+        state.players = state.players.map((p, i) => ({
+            ...p,
+            id: table.players[i] ? table.players[i].id : null,
+            ready: table.players[i] ? !!table.players[i].ready : false,
+        }));
+        state.tableId = table.id;
+        state.mode = table.mode;
+        state.maxPlayers = maxPlayers;
+        state.readyCount = table.players.filter(p => p.ready).length;
+        state.canStart = table.players.length === maxPlayers && table.players.every(p => p.ready);
+    }
+    return state;
+}
+
 function broadcastState(table, state, sourcePlayerId) {
     // Relay a full machine-state swap. Everyone including the sender gets it
     // (idempotent snapshot semantics — the sender's own render already has it,
     // re-rendering the same object is a no-op visually).
     streams.forEach((s) => {
         const index = table.players.findIndex(p => p.id === s.playerId);
-        if (s.tableId === table.id && index !== -1) sendSse(s.res, 'state', { tableId: table.id, state: table.engine.getState(index) });
+        if (s.tableId === table.id && index !== -1) sendSse(s.res, 'state', { tableId: table.id, state: stateForPlayer(table, index) });
     });
 }
 
@@ -146,16 +170,24 @@ function broadcastChat(table, chat) {
     });
 }
 
-function broadcastTableJoin(table) {
-    // Everyone in the table gets the updated player roster + server timer for
-    // handshake bookkeeping (kept identical to the "state" event shape).
+// Push the roster / waiting room (or the freshly started game) to every seat,
+// then refresh the lobby list everywhere.
+function broadcastTableState(table) {
     streams.forEach((s) => {
         if (s.tableId === table.id) {
             const index = table.players.findIndex(p => p.id === s.playerId);
-            if (index !== -1) sendSse(s.res, 'state', { tableId: table.id, state: table.engine.getState(index) });
+            if (index !== -1) sendSse(s.res, 'state', { tableId: table.id, state: stateForPlayer(table, index) });
         }
     });
     broadcastTables(); // lobby rosters everywhere
+}
+
+function maybeStartGame(table) {
+    const maxPlayers = seatCountForMode(table.mode);
+    if (table.players.length === maxPlayers && table.players.every(p => p.ready)) {
+        return table.engine.startGame();
+    }
+    return false;
 }
 
 // ---------------------------------------------------------------------------
@@ -172,7 +204,9 @@ function createTable(mode, name, playerId) {
         engine: new SixzeeServerEngine()
     };
     if (name) {
-        table.players.push({ id: playerId, name, ready: true });
+        // The host takes a seat but is NOT auto-ready. Everyone reviews the
+        // table and explicitly raises their hand before the dice start.
+        table.players.push({ id: playerId, name, ready: false });
         table.engine.addPlayer(name, playerId);
     }
     tables.set(id, table);
@@ -190,12 +224,21 @@ function joinTable(table, playerName, playerId) {
     if (table.players.length >= maxPlayers) {
         return { success: false, error: 'Table full' };
     }
-    const player = { id: playerId, name: playerName, ready: true };
+    const player = { id: playerId, name: playerName, ready: false };
     table.players.push(player);
     table.engine.addPlayer(playerName, playerId);
-    if (table.players.length === maxPlayers) table.engine.startGame();
-    broadcastTableJoin(table);
+    maybeStartGame(table);
+    broadcastTableState(table);
     return { success: true, playerId: player.id, table };
+}
+
+function setPlayerReady(table, playerId, ready) {
+    const player = table.players.find(p => p.id === playerId);
+    if (!player) return null;
+    player.ready = !!ready;
+    const started = maybeStartGame(table);
+    broadcastTableState(table);
+    return { table, started };
 }
 
 function leaveTable(table, playerId) {
@@ -428,7 +471,7 @@ const server = http.createServer((req, res) => {
             const table = findTable(tableId);
             if (table) {
                 const index = table.players.findIndex(p => p.id === playerId);
-                if (index !== -1) sendSse(res, 'state', { tableId, state: table.engine.getState(index) });
+                if (index !== -1) sendSse(res, 'state', { tableId, state: stateForPlayer(table, index) });
                 const roster = tableToJson(table);
                 sendSse(res, 'roster', roster.players);
             }
@@ -480,7 +523,7 @@ const server = http.createServer((req, res) => {
     }
 
     // ---- API: join/leave/state/chat per table ------------------------------------
-    const tableMatch = p.match(/^\/api\/tables\/([^/]+)\/(join|leave|state|chat|action)$/);
+    const tableMatch = p.match(/^\/api\/tables\/([^/]+)\/(join|leave|ready|state|chat|action)$/);
     if (tableMatch) {
         const tableId = tableMatch[1];
         const op = tableMatch[2];
@@ -506,13 +549,20 @@ const server = http.createServer((req, res) => {
                 }
                 case 'leave': {
                     leaveTable(table, body && body.playerId);
+                    broadcastTableState(table);
                     sendJson(res, 200, { success: true });
+                    return;
+                }
+                case 'ready': {
+                    const result = setPlayerReady(table, body && body.playerId, body && body.ready);
+                    if (!result) { sendJson(res, 403, { success: false, error: 'Take a seat first' }); return; }
+                    sendJson(res, 200, { success: true, table: tableToJson(table), started: result.started });
                     return;
                 }
                 case 'state': {
                     const index = table.players.findIndex(p => p.id === (body && body.playerId));
                     if (index === -1) { sendJson(res, 403, { success: false, error: 'Take a seat first' }); return; }
-                    sendJson(res, 200, { success: true, ok: true, state: table.engine.getState(index) });
+                    sendJson(res, 200, { success: true, ok: true, state: stateForPlayer(table, index) });
                     return;
                 }
                 case 'action': {

@@ -46,7 +46,7 @@ Public build: **https://github.com/goldennftplatform-svg/sixzee**
 ## Play modes
 
 - **Play vs AI** — free solo tables with 2–6 seats. AI players roll, hold and score automatically.
-- **Create table / open tables** — real cross-device 2–6 player tables over the Node relay (SSE + HTTP POST).
+- **Create table / open tables** — real cross-device 2–6 player tables over the Node relay (SSE + HTTP POST). Hosting a table opens a **waiting room**: every seat is visible, you can **INVITE A FRIEND** with a direct seat link, and the game deals in only when all seats are filled and every player presses **READY UP**. No AI ever joins a human table.
 - **Token matches** — signed-in accounts can stake 20 test pts (0.02 tLTC) against the funded AI bankroll in head-to-head play. Test coins have no cash value.
 
 Static GitHub Pages hosts play solo; human tables need the relay because Pages has no `/api/*` backend. `config.js` decides this in one place.

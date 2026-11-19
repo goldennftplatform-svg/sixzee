@@ -33,16 +33,35 @@ const { server } = require('../server');
         })).success, true);
     }
     assert.equal((await request(sixRoot + '/join', { name: 'P7', playerId: 'p7' })).status, 409);
-    const sixState = (await request(sixRoot + '/state', { playerId: 'p1', pull: true })).state;
+    let sixState = (await request(sixRoot + '/state', { playerId: 'p1', pull: true })).state;
     assert.equal(sixState.players.length, 6);
+    // A full table waits in the lobby until every seat has explicitly readied.
+    assert.equal(sixState.phase, 'WAITING');
+    assert.equal(sixState.readyCount, 0);
+    assert.ok(sixState.players.every((p) => p.ready === false));
+    for (let seat = 1; seat <= 6; seat += 1) {
+        assert.equal((await request(sixRoot + '/ready', { playerId: 'p' + seat, ready: true })).success, true);
+    }
+    sixState = (await request(sixRoot + '/state', { playerId: 'p1', pull: true })).state;
     assert.equal(sixState.phase, 'ROLL');
 
     const created = await request('/api/tables', { mode: '1v1', name: 'HOST', playerId: 'host' });
     assert.equal(created.success, true);
     const root = '/api/tables/' + created.tableId;
-    assert.equal((await request(root + '/state', { playerId: 'host', pull: true })).state.phase, 'WAITING');
+    let hostState = (await request(root + '/state', { playerId: 'host', pull: true })).state;
+    assert.equal(hostState.phase, 'WAITING');
+    assert.equal(hostState.readyCount, 0);
+    assert.equal(hostState.canStart, false);
     assert.equal((await request(root + '/join', { name: 'GUEST', playerId: 'guest' })).success, true);
     assert.equal((await request(root + '/join', { name: 'THIRD', playerId: 'third' })).status, 409);
+    // Two seats filled is still a waiting room — no dice until both ready up.
+    hostState = (await request(root + '/state', { playerId: 'host', pull: true })).state;
+    assert.equal(hostState.phase, 'WAITING');
+    assert.equal((await request(root + '/ready', { playerId: 'host', ready: true })).success, true);
+    hostState = (await request(root + '/state', { playerId: 'host', pull: true })).state;
+    assert.equal(hostState.phase, 'WAITING');
+    assert.equal(hostState.readyCount, 1);
+    assert.equal((await request(root + '/ready', { playerId: 'guest', ready: true })).success, true);
 
     let state = (await request(root + '/state', { playerId: 'host', pull: true })).state;
     assert.equal(state.phase, 'ROLL');

@@ -500,6 +500,87 @@ body {
   border-style: dashed;
 }
 
+/* Waiting room: sit at the table, see every seat, ready up together. */
+.lobby-hidden { display: none !important; }
+
+.table-lobby {
+  padding: 22px clamp(14px, 4vw, 40px) 28px;
+  border-bottom: 1px solid var(--sixzee-gold-dim);
+  background:
+    radial-gradient(circle at 50% -20%, rgba(244, 187, 63, 0.16), transparent 55%),
+    linear-gradient(180deg, rgba(10, 38, 47, 0.7), rgba(3, 16, 22, 0.9));
+}
+
+.table-lobby[hidden] { display: none; }
+
+.lobby-head { text-align: center; margin-bottom: 18px; }
+.lobby-icon { font-size: 40px; line-height: 1; }
+.lobby-head h2 {
+  margin: 6px 0 4px;
+  color: var(--sixzee-gold);
+  font-family: 'Press Start 2P', monospace;
+  font-size: clamp(11px, 2.4vw, 16px);
+  line-height: 1.6;
+}
+.lobby-head p { margin: 0; color: rgba(246, 234, 208, 0.82); font-family: 'VT323', monospace; font-size: 17px; }
+
+.lobby-seats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  margin: 0 auto 20px;
+  max-width: 900px;
+}
+
+.lobby-seat {
+  --chip-color: var(--sixzee-gold);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  border: 2px solid var(--sixzee-gold-dim);
+  background: rgba(3, 16, 22, 0.82);
+  box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.5);
+}
+.lobby-seat.you { border-color: var(--chip-color); box-shadow: 0 0 16px rgba(244, 187, 63, 0.25); }
+.lobby-seat.ready { background: rgba(95, 224, 208, 0.1); border-color: var(--sixzee-teal); }
+.lobby-seat.empty { border-style: dashed; opacity: 0.6; }
+.seat-num {
+  color: var(--chip-color);
+  font-family: 'Press Start 2P', monospace;
+  font-size: 9px;
+}
+.seat-name { color: var(--sixzee-ivory); font-family: 'VT323', monospace; font-size: 18px; word-break: break-word; }
+.seat-ready {
+  color: rgba(246, 234, 208, 0.7);
+  font-family: 'Press Start 2P', monospace;
+  font-size: 8px;
+}
+.lobby-seat.ready .seat-ready { color: var(--sixzee-teal); }
+
+.lobby-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.lobby-actions .pixel-btn { min-width: 150px; }
+#lobby-ready-btn.is-ready { background: var(--sixzee-teal); color: #06171f; }
+
+.lobby-status {
+  margin: 0;
+  text-align: center;
+  color: var(--sixzee-gold);
+  font-family: 'VT323', monospace;
+  font-size: 18px;
+}
+
+@media (max-width: 860px) {
+  .lobby-seats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .lobby-actions .pixel-btn { flex: 1 1 140px; min-width: 0; }
+}
+
 @media (max-width: 860px) {
   .sixzee-board { grid-template-columns: 1fr; }
   .dice-stage, .scorecard-wrap, .board-info, .opponents-area { grid-column: 1; }

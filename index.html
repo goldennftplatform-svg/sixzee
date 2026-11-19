@@ -37,7 +37,7 @@
     <link rel="stylesheet" href="app-layout.css?v=4">
     <link rel="stylesheet" href="wallet-dropdown.css?v=20261118-metamask-network">
     <link rel="stylesheet" href="app-shell.css?v=20261119-glossy-shell">
-    <link rel="stylesheet" href="sixzee.css?v=20261119b">
+    <link rel="stylesheet" href="sixzee.css?v=20261119d">
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -233,6 +233,21 @@
                     </div>
                 </header>
 
+                <div class="table-lobby" id="table-lobby" hidden>
+                    <div class="lobby-head">
+                        <div class="lobby-icon">🦁</div>
+                        <h2 id="lobby-title">YOUR TABLE</h2>
+                        <p id="lobby-sub">Get everyone to the table, then ready up.</p>
+                    </div>
+                    <div class="lobby-seats" id="lobby-seats"></div>
+                    <div class="lobby-actions">
+                        <button type="button" class="pixel-btn" id="lobby-invite-btn">🔗 INVITE A FRIEND</button>
+                        <button type="button" class="pixel-btn primary" id="lobby-ready-btn">READY UP</button>
+                        <button type="button" class="pixel-btn secondary" id="lobby-leave-btn">LEAVE TABLE</button>
+                    </div>
+                    <p class="lobby-status" id="lobby-status">Waiting for players...</p>
+                </div>
+
                 <div class="sixzee-board">
                     <div class="board-info">
                         <div class="player-score" id="player-scores"></div>
@@ -285,9 +300,9 @@
     <script src="config.js"></script>
     <script src="player-profile.js"></script>
     <script src="sixzee-engine.js?v=20261119b"></script>
-    <script src="network.js"></script>
-    <script src="game.js?v=20261119c"></script>
-    <script src="main.js"></script>
+    <script src="network.js?v=20261119d"></script>
+    <script src="game.js?v=20261119e"></script>
+    <script src="main.js?v=20261119d"></script>
     <script src="wallet.js"></script>
     <script src="metamask.js"></script>
 </body>

@@ -56,6 +56,10 @@ function setupEventListeners() {
             return;
         }
         game.savePlayerName(name);
+        if (game.pendingInviteTable) {
+            game.joinGame(game.pendingInviteTable);
+            return;
+        }
         game.showModal('READY', `Name set to: ${name}. Select a table or create one.`, [
             { text: 'OK', action: () => game.hideModal() }
         ]);

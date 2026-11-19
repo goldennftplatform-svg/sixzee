@@ -25,7 +25,7 @@
  *   on/off(event, cb)  events: connected, disconnected, state, tableList,
  *                                chat, connectionState
  *   getServerUrl(), getConnectionStatus(), getTableList(), getTableState()
- *   createTable(mode, name), joinTable(tableId, name), leaveTable()
+ *   createTable(mode, name), joinTable(tableId, name), setReady(ready), leaveTable()
  *   broadcastState(state), sendGameAction(action, payload), sendChat(message)
  *   syncState(), getServerUrl(), disconnect()
  */
@@ -202,6 +202,14 @@ function GameNetwork() {
         return Promise.resolve({ success: false, error: 'Connect to the multiplayer relay to join a human table.' });
     }
 
+    function setReady(ready) {
+        if (state.mode === 'relay' && state.tableId) {
+            return post('/api/tables/' + state.tableId + '/ready', { playerId: state.playerId, ready: !!ready })
+                .then(function (res) { return res; });
+        }
+        return Promise.resolve({ success: false, error: 'No relay connection' });
+    }
+
     function leaveTable() {
         if (state.mode === 'relay' && state.tableId) {
             return post('/api/tables/' + state.tableId + '/leave', { playerId: state.playerId }).then(function (res) {
@@ -293,6 +301,7 @@ function GameNetwork() {
         getTableState: getTableState,
         createTable: createTable,
         joinTable: joinTable,
+        setReady: setReady,
         leaveTable: leaveTable,
         broadcastState: broadcastState,
         sendGameAction: sendGameAction,
