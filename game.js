@@ -15,6 +15,10 @@ const SIXZEE_DIE_PIPS = {
     6: [0, 2, 3, 5, 6, 8],
 };
 
+// A blocky "6" with exactly 13 lit cells — one per scorecard category.
+// Cells light up in reading order as a player fills their card.
+const SIXZEE_PROGRESS_ROWS = ['111', '100', '111', '100', '101', '111'];
+
 class SixzeeUI {
     constructor() {
         const api = window.Sixzee;
@@ -511,15 +515,30 @@ class SixzeeUI {
         this.renderStatus(state);
     }
 
+    sixGlyph(filled, compact = false) {
+        const total = SIXZEE_PROGRESS_ROWS.join('').split('1').length - 1;
+        const progress = Math.max(0, Math.min(total, Number(filled) || 0));
+        let cell = 0;
+        const rows = SIXZEE_PROGRESS_ROWS.map((row) => `
+            <span class="six-row">${row.split('').map((value) => {
+                if (value !== '1') return '<span class="six-cell gap"></span>';
+                cell += 1;
+                return `<span class="six-cell ${cell <= progress ? 'lit' : ''}"></span>`;
+            }).join('')}</span>`).join('');
+        return `<span class="six-glyph ${compact ? 'compact' : ''}" role="img" aria-label="${progress} of ${total} categories filled">${rows}</span>`;
+    }
+
     renderPlayerChips(state) {
         const host = document.getElementById('player-scores');
         if (!host) return;
         const colors = ['#f4bb3f', '#5fe0d0', '#ff8fb1', '#a6d86b', '#c58bff', '#ff9d5c'];
         host.innerHTML = state.players.map((p, i) => `
             <div class="player-chip ${i === state.currentPlayer ? 'active' : ''}" style="--chip-color:${colors[i % colors.length]}">
-                <span class="seat-dot"></span>
-                ${this.escapeHtml(p.name)}
-                ${p.sixzeeBonuses ? `<span class="chip-bonus" title="${p.sixzeeBonuses} extra Sixzee bonus">+${p.sixzeeBonuses * 100}</span>` : ''}
+                ${this.sixGlyph(p.score?.filled || 0, true)}
+                <span class="chip-copy">
+                    <span class="chip-name">${this.escapeHtml(p.name)}</span>
+                    ${p.sixzeeBonuses ? `<span class="chip-bonus" title="${p.sixzeeBonuses} extra Sixzee bonus">+${p.sixzeeBonuses * 100} SIXZEE</span>` : ''}
+                </span>
                 <b>${p.score?.total ?? 0}</b>
             </div>`).join('');
     }
@@ -532,7 +551,10 @@ class SixzeeUI {
             .filter((entry) => entry.index !== state.yourIndex);
         host.innerHTML = others.map(({ player, index }) => `
             <div class="opponent-card ${index === state.currentPlayer ? 'active' : 'waiting'}">
-                ${this.escapeHtml(player.name)} · ${player.score?.total ?? 0} pts · ${player.score?.filled ?? 0}/13
+                ${this.sixGlyph(player.score?.filled || 0, true)}
+                <span>${this.escapeHtml(player.name)}</span>
+                <b>${player.score?.total ?? 0}</b>
+                <small>${player.score?.filled ?? 0}/13</small>
             </div>`).join('');
     }
 
@@ -643,12 +665,25 @@ class SixzeeUI {
 
         const totals = document.getElementById('score-totals');
         if (totals) {
+            const upperPct = Math.min(100, Math.round((score.upperSubtotal / 84) * 100));
+            const progressLabel = score.filled === 13
+                ? 'CARD COMPLETE'
+                : score.bonus ? 'UPPER BONUS LOCKED' : `${13 - score.filled} CATEGORIES OPEN`;
             totals.innerHTML = `
-                <div class="grand-total"><span>GRAND TOTAL</span><b>${score.total}</b><small>${score.filled} / 13 categories filled</small></div>
-                <div class="total-box">UPPER<b>${score.upperSubtotal}</b></div>
-                <div class="total-box">BONUS<b>${score.bonus} / 35</b></div>
-                <div class="total-box">SIXZEE<b>+${score.sixzeeBonus}</b></div>
-                <div class="total-box">LOWER<b>${score.lowerSubtotal}</b></div>`;
+                <div class="sixzee-progress-card">
+                    <div class="progress-six">${this.sixGlyph(score.filled)}</div>
+                    <div class="progress-main">
+                        <span class="progress-kicker">SIXZEE · CARD PROGRESS</span>
+                        <div class="progress-title"><strong>${score.filled}</strong><span>/13</span><em>${progressLabel}</em></div>
+                        <div class="bonus-meter"><span style="width:${upperPct}%"></span></div>
+                        <div class="bonus-caption"><span>UPPER BONUS</span><b>${score.upperSubtotal} / 84</b><small>${score.bonus ? '+35 LOCKED' : '+35 AT 84'}</small></div>
+                    </div>
+                    <div class="progress-score">
+                        <span>GRAND TOTAL</span>
+                        <b>${score.total}</b>
+                        <small>UP ${score.upperSubtotal} · LOW ${score.lowerSubtotal}${score.sixzeeBonus ? ` · +${score.sixzeeBonus}` : ''}</small>
+                    </div>
+                </div>`;
         }
     }
 

@@ -25,6 +25,14 @@ body {
 
 #game-container { max-width: 1180px; }
 
+/* app-layout.css still has a cribbage-era two-column game shell. Sixzee uses
+   the full width so the dice and paper scorecard are not squeezed into one
+   narrow column with an empty second column. */
+#game-screen > .pixel-border {
+  display: flex;
+  flex-direction: column;
+}
+
 .pixel-header .logo h1,
 .pixel-header .tagline {
   color: var(--sixzee-ivory);
@@ -95,6 +103,7 @@ body {
 
 .dice-stage {
   grid-column: 1;
+  align-self: start;
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -304,51 +313,160 @@ body {
 .score-summary.summary-line { border-top: 2px solid rgba(122, 63, 24, 0.55); margin-top: 5px; }
 .score-summary.summary-hit b { color: #0a7d6f; }
 
-.score-totals {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(95px, 1fr));
-  gap: 8px;
+/* The chunky 6 is the real progress meter: 13 blocks, one per category. */
+.six-glyph {
+  --six-size: 9px;
+  --six-gap: 3px;
+  display: inline-grid;
+  grid-template-columns: repeat(3, var(--six-size));
+  grid-template-rows: repeat(6, var(--six-size));
+  gap: var(--six-gap);
+  flex: none;
 }
 
-.grand-total {
-  grid-column: 1 / -1;
+.six-glyph.compact { --six-size: 4px; --six-gap: 1px; }
+.six-row { display: contents; }
+
+.six-cell {
+  width: var(--six-size);
+  height: var(--six-size);
+  border: 1px solid rgba(244, 187, 63, 0.28);
+  background: rgba(244, 187, 63, 0.1);
+  box-shadow: inset 0 0 0 1px rgba(3, 16, 22, 0.5);
+}
+
+.six-cell.gap { border-color: transparent; background: transparent; box-shadow: none; }
+
+.six-cell.lit {
+  border-color: #ffe8a3;
+  background: var(--sixzee-gold);
+  box-shadow: 0 0 8px rgba(244, 187, 63, 0.75), inset 0 0 0 1px rgba(122, 63, 24, 0.4);
+}
+
+.six-glyph.compact .six-cell {
+  border-color: rgba(246, 234, 208, 0.22);
+  background: rgba(246, 234, 208, 0.1);
+  box-shadow: none;
+}
+
+.six-glyph.compact .six-cell.lit {
+  border-color: var(--chip-color, var(--sixzee-gold));
+  background: var(--chip-color, var(--sixzee-gold));
+  box-shadow: 0 0 5px var(--chip-color, var(--sixzee-gold));
+}
+
+.chip-copy { display: flex; flex-direction: column; line-height: 1.05; min-width: 0; }
+.chip-name { white-space: nowrap; }
+.chip-bonus { font-size: 12px; }
+
+.score-totals { display: block; }
+
+.sixzee-progress-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 16px;
+  padding: 13px 16px;
+  border: 2px solid var(--sixzee-gold-dim);
+  background:
+    radial-gradient(circle at 12% 30%, rgba(244, 187, 63, 0.14), transparent 42%),
+    linear-gradient(120deg, rgba(10, 38, 47, 0.96), rgba(3, 16, 22, 0.96));
+  box-shadow: inset 0 0 22px rgba(0, 0, 0, 0.55), 0 6px 0 rgba(109, 79, 28, 0.6);
+  overflow: hidden;
+}
+
+.sixzee-progress-card::after {
+  content: 'SIXZEE';
+  position: absolute;
+  right: 10px;
+  top: -10px;
+  color: rgba(244, 187, 63, 0.06);
+  font-family: 'Press Start 2P', monospace;
+  font-size: 46px;
+  pointer-events: none;
+}
+
+.progress-six {
+  --six-size: 10px;
+  --six-gap: 3px;
+  display: grid;
+  place-items: center;
+  padding: 9px;
+  border: 1px solid var(--sixzee-line);
+  background: rgba(3, 16, 22, 0.72);
+}
+
+.progress-main { min-width: 0; }
+
+.progress-kicker {
+  color: var(--sixzee-teal);
+  font-family: 'Press Start 2P', monospace;
+  font-size: 8px;
+  letter-spacing: 1px;
+}
+
+.progress-title { display: flex; align-items: baseline; gap: 5px; margin: 5px 0 7px; }
+.progress-title strong { color: var(--sixzee-gold); font-family: 'Press Start 2P', monospace; font-size: 28px; }
+.progress-title span { color: rgba(246, 234, 208, 0.65); font-family: 'VT323', monospace; font-size: 20px; }
+.progress-title em {
+  margin-left: auto;
+  color: var(--sixzee-ivory);
+  font-family: 'VT323', monospace;
+  font-size: 15px;
+  font-style: normal;
+}
+
+.bonus-meter {
+  height: 8px;
+  border: 1px solid var(--sixzee-gold-dim);
+  background: rgba(3, 16, 22, 0.85);
+}
+
+.bonus-meter span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--sixzee-teal), var(--sixzee-gold));
+  box-shadow: 0 0 10px rgba(95, 224, 208, 0.45);
+  transition: width 220ms ease;
+}
+
+.bonus-caption {
   display: flex;
   justify-content: space-between;
-  align-items: baseline;
   gap: 10px;
-  padding: 9px 12px;
-  border: 2px solid #f4bb3f;
-  background: #7a3f18;
-  color: var(--sixzee-ivory);
+  margin-top: 5px;
+  color: rgba(246, 234, 208, 0.8);
   font-family: 'VT323', monospace;
-  font-size: 18px;
+  font-size: 14px;
 }
 
-.grand-total b {
-  color: #f4bb3f;
+.bonus-caption b { color: var(--sixzee-gold); }
+.bonus-caption small { color: var(--sixzee-teal); }
+
+.progress-score {
+  position: relative;
+  z-index: 1;
+  padding-left: 16px;
+  border-left: 1px dashed var(--sixzee-gold-dim);
+  text-align: right;
+}
+
+.progress-score > span {
+  color: rgba(246, 234, 208, 0.7);
   font-family: 'Press Start 2P', monospace;
-  font-size: 22px;
+  font-size: 8px;
 }
 
-.grand-total small { color: rgba(246, 234, 208, 0.75); font-size: 14px; }
-
-.total-box {
-  padding: 10px;
-  border: 1px solid var(--sixzee-line);
-  background: rgba(3, 16, 22, 0.8);
-  color: var(--sixzee-ivory);
-  font-family: 'VT323', monospace;
-  font-size: 17px;
-  text-align: center;
-}
-
-.total-box b {
+.progress-score b {
   display: block;
   color: var(--sixzee-gold);
   font-family: 'Press Start 2P', monospace;
-  font-size: 14px;
-  margin-top: 4px;
+  font-size: 24px;
+  margin: 6px 0 3px;
 }
+
+.progress-score small { color: rgba(246, 234, 208, 0.72); font-family: 'VT323', monospace; font-size: 13px; }
 
 .chip-bonus {
   padding: 1px 5px;
@@ -388,4 +506,14 @@ body {
   .dice-tray { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
   .die { max-width: 76px; }
   .dice-header { font-size: 8px; }
+  .sixzee-progress-card { grid-template-columns: auto 1fr; gap: 12px; }
+  .progress-score {
+    grid-column: 1 / -1;
+    padding: 8px 0 0;
+    border-left: 0;
+    border-top: 1px dashed var(--sixzee-gold-dim);
+    text-align: left;
+  }
+  .progress-score b { display: inline-block; margin: 0 10px; }
+  .progress-title em { margin-left: 0; }
 }
