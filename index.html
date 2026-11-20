@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="theme-color" content="#06171f">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Sixzee">
@@ -37,7 +38,7 @@
     <link rel="stylesheet" href="app-layout.css?v=4">
     <link rel="stylesheet" href="wallet-dropdown.css?v=20261118-metamask-network">
     <link rel="stylesheet" href="app-shell.css?v=20261119-glossy-shell">
-    <link rel="stylesheet" href="sixzee.css?v=20261119f">
+    <link rel="stylesheet" href="sixzee.css?v=20261119h">
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -264,7 +265,11 @@
                         <div class="dice-tray" id="dice-tray" aria-label="Six dice. Click a die to hold it."></div>
                         <div class="dice-actions">
                             <button class="pixel-btn action-btn" id="roll-btn" disabled>ROLL DICE</button>
-                            <span class="dice-hint">CLICK DICE TO HOLD · CLICK A CATEGORY TO SCORE</span>
+                            <span class="dice-hint">
+                                <span class="hint-desktop">CLICK DICE TO HOLD · CLICK A CATEGORY TO SCORE</span>
+                                <span class="hint-touch">TAP DICE TO HOLD · TAP A CATEGORY TO SCORE</span>
+                                <span class="hint-compact">TAP DICE TO HOLD</span>
+                            </span>
                         </div>
                     </div>
 
@@ -300,8 +305,8 @@
     <script src="config.js"></script>
     <script src="player-profile.js"></script>
     <script src="sixzee-engine.js?v=20261119b"></script>
-    <script src="network.js?v=20261119f"></script>
-    <script src="game.js?v=20261119f"></script>
+    <script src="network.js?v=20261119g"></script>
+    <script src="game.js?v=20261119g"></script>
     <script src="main.js?v=20261119d"></script>
     <script src="wallet.js"></script>
     <script src="metamask.js"></script>

@@ -702,13 +702,20 @@ class SixzeeUI {
         // before the very first roll of the whole game.
         const blank = !state.hasRolled && state.phase !== 'GAME_OVER';
         const canHold = state.isYourTurn && !blank && state.rollsLeft > 0 && state.phase !== 'GAME_OVER';
+        // Only dice whose face actually changed animate, so holding a die never
+        // replays the roll animation for the whole tray.
+        const values = blank ? state.dice.map(() => null) : state.dice.map((die) => die.value);
+        const previous = this.lastDiceValues;
+        const changed = Array.isArray(previous) && previous.length === values.length
+            && values.some((value, index) => value !== previous[index]);
+        this.lastDiceValues = values;
         tray.innerHTML = state.dice.map((die, index) => {
             const held = Boolean(die.held);
             const pips = blank ? [] : (SIXZEE_DIE_PIPS[die.value] || []);
             const face = Array.from({ length: 9 }, (_, cell) => (
                 pips.includes(cell) ? '<span class="pip"></span>' : '<span></span>'
             )).join('');
-            return `<button type="button" class="die ${held ? 'held' : ''} ${canHold ? '' : 'locked'}"
+            return `<button type="button" class="die ${held ? 'held' : ''} ${canHold ? '' : 'locked'} ${changed && !held && !blank ? 'rolling' : ''}"
                         data-die-index="${index}" aria-label="Die ${index + 1}${held ? ', held' : ''}" ${canHold ? '' : 'disabled'}>
                         <span class="die-face">${face}</span>
                     </button>`;
