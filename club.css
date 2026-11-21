@@ -1,0 +1,40 @@
+/* Printed club stationery, brass trim and felt. */
+:root { --club-felt: #254537; --club-paper: #f4ecd7; --club-brass: #c6ac71; }
+#landing-screen > .pixel-border, #game-screen > .pixel-border {
+  border: 1px solid #948365; border-radius: 5px; background: #202e26;
+}
+#landing-screen header.pixel-header, #game-screen .game-header {
+  border-radius: 4px 4px 0 0; border-bottom: 4px double var(--club-brass);
+  background: linear-gradient(90deg, #183527f5, #243e30e0 58%, #172e20ab),
+              url('assets/safari-knights-reference.jpg') center 35% / cover;
+}
+#landing-screen .pixel-header::before, #landing-screen .pixel-header::after,
+.mode-cards .mode-card::before { display: none; }
+.pixel-header .logo img { display: block; width: min(240px, 65vw); height: auto; }
+.pixel-header .tagline { font: 15px Georgia, serif; color: var(--club-paper); letter-spacing: .04em; text-shadow: none; }
+#landing-screen :is(.stake-banner, .metamask-cta, .table-card, .profile-customizer) {
+  background: #293b30; border: 1px solid #756f55; border-radius: 3px; box-shadow: none;
+}
+#landing-screen :is(.mode-selector, .table-list, .ai-section) h2 {
+  font: bold 22px Georgia, serif; letter-spacing: .04em; color: var(--club-paper); text-shadow: none;
+}
+.mode-cards { counter-reset: seats 1; }
+.mode-cards .mode-card {
+  counter-increment: seats; background: var(--club-paper); color: #23372a;
+  border: 2px solid #ac9e80; border-radius: 3px; box-shadow: none; transform: none;
+}
+.mode-cards .mode-card.selected { border-color: var(--club-brass); background: #d9c99e; box-shadow: inset 0 0 0 3px #345140; }
+.mode-card .mode-icon { font-size: 0; }
+.mode-card .mode-icon::after { content: counter(seats, decimal-leading-zero); font: bold 30px Georgia, serif; color: #405840; }
+.mode-cards .mode-card :is(h3,p,.players) { font-family: Georgia, serif; color: #23372a; background: transparent; text-shadow: none; }
+#landing-screen :is(.pixel-btn,.header-wallet-link,.header-install-link), #game-screen .pixel-btn {
+  border-radius: 3px; border: 1px solid var(--club-brass); background: var(--club-felt);
+  color: var(--club-paper); font-family: Arial, sans-serif; font-weight: bold; text-shadow: none; animation: none;
+}
+#landing-screen #play-ai-btn { background: var(--club-paper); color: #23372a; }
+@media (max-width: 700px) {
+  #landing-screen header.pixel-header { padding-top: 12px; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+  .pixel-header :is(.logo,.tagline) { width: 100%; margin: 0; }
+  .pixel-header :is(#wallet-toggle,#install-btn) { position: static; order: -1; min-height: 44px; }
+  #landing-screen #wallet-menu { top: 62px; }
+}

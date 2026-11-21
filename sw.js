@@ -1,10 +1,12 @@
 /* SIXZEE - installable app shell. API/relay traffic is never cached. */
-const CACHE = 'sixzee-v20261121c';
+const CACHE = 'sixzee-v20261121-club';
 const ASSETS = [
   './',
   './index.html',
   './manifest.webmanifest',
   './assets/icon.svg',
+  './assets/sixzee-club.svg',
+  './club.css',
   './assets/icon-192.png',
   './assets/icon-512.png',
   './assets/icon-maskable-512.png',
