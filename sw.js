@@ -1,5 +1,5 @@
 /* SIXZEE - installable app shell. API/relay traffic is never cached. */
-const CACHE = 'sixzee-v20261121-pwa';
+const CACHE = 'sixzee-v20261121b';
 const ASSETS = [
   './',
   './index.html',
@@ -13,13 +13,13 @@ const ASSETS = [
   './app-layout.css?v=4',
   './wallet-dropdown.css?v=20261118-metamask-network',
   './app-shell.css?v=20261119-glossy-shell',
-  './sixzee.css?v=20261119h',
+  './sixzee.css?v=20261121a',
   './config.js',
   './player-profile.js',
   './sixzee-engine.js?v=20261119b',
   './network.js?v=20261119g',
   './game.js?v=20261119g',
-  './main.js?v=20261119d',
+  './main.js?v=20261121a',
   './wallet.js',
   './metamask.js',
   './pwa.js?v=20261121'

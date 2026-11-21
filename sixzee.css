@@ -69,7 +69,7 @@ body {
 .header-install-link[hidden] { display: none !important; }
 
 @media (max-width: 480px) {
-  .header-install-link { top: 8px; right: 92px; padding: 7px 8px; font-size: 7px; }
+  .header-install-link { top: 8px; right: 108px; padding: 7px 8px; font-size: 7px; }
 }
 
 .sixzee-board {

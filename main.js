@@ -9,6 +9,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 function setupEventListeners() {
+    setupWalletDropdown();
+
     document.querySelectorAll('.mode-card').forEach((card) => {
         card.addEventListener('click', () => {
             document.querySelectorAll('.mode-card').forEach((c) => c.classList.remove('selected'));
@@ -89,6 +91,35 @@ function setupEventListeners() {
             if (!document.getElementById('roll-btn')?.disabled) game.rollAction();
         }
         if (e.key.toLowerCase() === 'r') game.showRules();
+    });
+}
+
+function setupWalletDropdown() {
+    const toggle = document.getElementById('wallet-toggle');
+    const menu = document.getElementById('wallet-menu');
+    if (!toggle || !menu) return;
+
+    const setOpen = (open) => {
+        menu.hidden = !open;
+        toggle.setAttribute('aria-expanded', String(open));
+    };
+
+    toggle.addEventListener('click', (event) => {
+        event.stopPropagation();
+        setOpen(menu.hidden);
+    });
+
+    menu.addEventListener('click', (event) => event.stopPropagation());
+
+    document.addEventListener('click', () => {
+        if (!menu.hidden) setOpen(false);
+    });
+
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && !menu.hidden) {
+            setOpen(false);
+            toggle.focus();
+        }
     });
 }
 
