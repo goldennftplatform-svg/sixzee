@@ -53,6 +53,16 @@ Human identity is stable per browser, and your table is remembered: closing the 
 
 Static GitHub Pages hosts play solo; human tables need the relay because Pages has no `/api/*` backend. `config.js` decides this in one place.
 
+## Install on Android
+
+Sixzee is an installable PWA — no APK or app store is needed.
+
+1. Open **https://goldennftplatform-svg.github.io/sixzee/** in Chrome on your Android device.
+2. Tap Chrome's **⋮ menu → Install app** (or **Add to Home screen**). When the browser detects that the app is installable, the **📲 INSTALL** pill in the header also appears and does the same thing.
+3. Launch **Sixzee** from the home screen. It opens in its own standalone window with its own icon, just like `abby123.aisp.live`.
+
+The manifest, service worker, and 192/512/maskable icons live at the repo root and `assets/`. The service worker caches the game shell for offline launches; live multiplayer, wallet, and relay calls are never cached. After a future update, reopening the installed app fetches the new shell and swaps cached files automatically.
+
 ## Run locally
 
 ```bash

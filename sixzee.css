@@ -41,6 +41,37 @@ body {
 
 .pixel-header .logo-icon { filter: drop-shadow(0 0 8px rgba(244, 187, 63, 0.6)); }
 
+/* PWA install affordance shown only when the browser offers an install prompt. */
+.header-install-link {
+  position: absolute;
+  top: 14px;
+  right: 124px;
+  z-index: 3;
+  padding: 9px 12px;
+  border: 1px solid var(--sixzee-gold);
+  border-radius: 999px;
+  background: rgba(6, 23, 31, 0.78);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  color: var(--sixzee-gold);
+  font: 700 9px/1 'Press Start 2P', cursive;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  backdrop-filter: blur(10px);
+}
+
+.header-install-link:hover,
+.header-install-link:focus-visible {
+  background: rgba(244, 187, 63, 0.18);
+  color: var(--sixzee-ivory);
+  box-shadow: 0 0 22px rgba(244, 187, 63, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
+.header-install-link[hidden] { display: none !important; }
+
+@media (max-width: 480px) {
+  .header-install-link { top: 8px; right: 92px; padding: 7px 8px; font-size: 7px; }
+}
+
 .sixzee-board {
   display: grid;
   grid-template-columns: minmax(260px, 1fr) minmax(360px, 1.35fr);

@@ -8,7 +8,9 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Sixzee">
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎲</text></svg>">
+    <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="assets/icon-192.png">
+    <link rel="manifest" href="manifest.webmanifest">
     <title>Sixzee — Six Dice. One Champion.</title>
     <meta name="description" content="Play Sixzee, an 8-bit six-dice scorecard game with classic Yahtzee-style rules, live 2–6 player tables, solo AI, and optional LitVM test-token matches.">
     <meta name="author" content="Sixzee">
@@ -53,6 +55,7 @@
                         <span class="logo-icon">⚡</span>
                     </div>
                     <p class="tagline">SIX DICE · ONE CHAMPION · LITVM-READY</p>
+                    <button type="button" class="header-install-link" id="install-btn" hidden aria-label="Install Sixzee on your device">📲 INSTALL</button>
                     <button type="button" class="header-wallet-link" id="wallet-toggle" aria-expanded="false" aria-controls="wallet-menu">WALLET <span aria-hidden="true">▾</span></button>
                 </header>
 
@@ -310,5 +313,6 @@
     <script src="main.js?v=20261119d"></script>
     <script src="wallet.js"></script>
     <script src="metamask.js"></script>
+    <script src="pwa.js?v=20261121"></script>
 </body>
 </html>

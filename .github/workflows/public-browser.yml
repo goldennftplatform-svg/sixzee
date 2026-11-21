@@ -12,7 +12,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: node tests/scoring.cjs && node tests/metamask.cjs
+      - run: node tests/scoring.cjs && node tests/pwa.cjs && node tests/metamask.cjs
       - name: Check Pages bundle references
         run: |
           grep -q 'sixzee-engine.js' index.html

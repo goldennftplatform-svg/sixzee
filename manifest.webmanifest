@@ -1,0 +1,41 @@
+{
+  "id": "./",
+  "name": "Sixzee — Six Dice. One Champion.",
+  "short_name": "Sixzee",
+  "description": "Play Sixzee, an 8-bit six-dice scorecard game with live 2–6 player tables, solo AI, and optional LitVM test-token matches.",
+  "lang": "en",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "any",
+  "background_color": "#06171f",
+  "theme_color": "#06171f",
+  "categories": ["games", "entertainment"],
+  "icons": [
+    {
+      "src": "./assets/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./assets/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./assets/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "./assets/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
