@@ -1,5 +1,5 @@
 /* SIXZEE - installable app shell. API/relay traffic is never cached. */
-const CACHE = 'sixzee-v20261121b';
+const CACHE = 'sixzee-v20261121c';
 const ASSETS = [
   './',
   './index.html',
@@ -22,7 +22,7 @@ const ASSETS = [
   './main.js?v=20261121a',
   './wallet.js',
   './metamask.js',
-  './pwa.js?v=20261121'
+  './pwa.js?v=20261121b'
 ];
 
 self.addEventListener('install', event => {
@@ -59,7 +59,9 @@ self.addEventListener('fetch', event => {
 
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request)
+      // Bypass the HTTP cache so a deployed index.html reaches installed PWAs
+      // on the next navigation instead of serving last launch's shell.
+      fetch(request.url, { cache: 'reload', credentials: 'same-origin' })
         .then(response => cacheResponse(request, response))
         .catch(() => caches.match('./index.html'))
     );
