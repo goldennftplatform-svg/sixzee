@@ -99,9 +99,18 @@ function setupWalletDropdown() {
     const menu = document.getElementById('wallet-menu');
     if (!toggle || !menu) return;
 
+    // The existing wallet entry mounts itself into #wallet-root.
+    let walletLoad;
     const setOpen = (open) => {
         menu.hidden = !open;
         toggle.setAttribute('aria-expanded', String(open));
+        if (open && !walletLoad) {
+            walletLoad = import('./wallet-assets/wallet.js?v=wallet-send-export-20261118')
+                .catch(() => {
+                    const status = document.querySelector('#wallet-root [role="status"]');
+                    if (status) status.textContent = 'Wallet sign-in could not load. Check your connection and reload, or try Full View below.';
+                });
+        }
     };
 
     toggle.addEventListener('click', (event) => {

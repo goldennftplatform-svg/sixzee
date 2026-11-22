@@ -1,5 +1,5 @@
 /* SIXZEE - installable app shell. API/relay traffic is never cached. */
-const CACHE = 'sixzee-v20261121-club';
+const CACHE = 'sixzee-v20261121-wallet-open';
 const ASSETS = [
   './',
   './index.html',
@@ -21,7 +21,7 @@ const ASSETS = [
   './sixzee-engine.js?v=20261119b',
   './network.js?v=20261119g',
   './game.js?v=20261119g',
-  './main.js?v=20261121a',
+  './main.js?v=wallet-open-1',
   './wallet.js',
   './metamask.js',
   './pwa.js?v=20261121b'
